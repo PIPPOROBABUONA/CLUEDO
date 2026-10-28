@@ -2,483 +2,755 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Cluedo P2P Detective</title>
-  <!-- PeerJS CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Cluedo 3D P2P Detective Edition</title>
+  
+  <!-- PeerJS WebRTC CDN -->
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- Three.js CDN per il motore grafico 3D -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
   <style>
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-      touch-action: manipulation; 
+    :root {
+      --bg-dark: #070a13;
+      --panel-bg: rgba(15, 23, 42, 0.92);
+      --gold: #f59e0b;
+      --gold-glow: rgba(245, 158, 11, 0.35);
+      --accent: #8b5cf6;
+      --crimson: #ef4444;
+      --emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-dark: #334155;
     }
-    body { 
-      background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%); 
-      color: #f8fafc; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      min-height: 100vh; 
-      padding: 10px;
-      overflow-x: hidden;
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
-    
-    .panel { 
-      background: rgba(30, 41, 59, 0.95); 
-      backdrop-filter: blur(10px);
-      padding: 18px; 
-      border-radius: 16px; 
-      width: 100%; 
-      max-width: 400px; 
-      margin-top: 10px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 12px; 
-      border: 1px solid rgba(255, 255, 255, 0.08); 
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: fixed;
     }
-    
-    input, select, button { 
-      padding: 12px 14px; 
-      border-radius: 10px; 
-      border: none; 
-      font-size: 15px; 
-      width: 100%; 
-      transition: all 0.2s ease;
+
+    /* Pannelli UI Base */
+    .glass-panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      border-radius: 16px;
     }
-    input, select { 
-      background: #0f172a; 
-      color: #fff; 
-      border: 1px solid #334155; 
+
+    input, select, button {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 15px;
+      width: 100%;
+      outline: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    input, select {
+      background: #0b1120;
+      color: #fff;
+      border: 1px solid var(--border-dark);
     }
     input:focus, select:focus {
-      outline: 2px solid #f59e0b;
-      border-color: transparent;
-    }
-    
-    button { 
-      background: #f59e0b; 
-      color: #0f172a; 
-      font-weight: 700; 
-      cursor: pointer; 
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
-    }
-    button:active { 
-      transform: scale(0.98);
-      filter: brightness(0.92); 
-    }
-    button:disabled { 
-      background: #334155 !important; 
-      color: #64748b !important; 
-      cursor: not-allowed; 
-      box-shadow: none;
-      transform: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 12px var(--gold-glow);
     }
 
-    /* Sala d'attesa */
-    .room-header { 
-      background: #0b1120; 
-      border: 1px dashed #f59e0b; 
-      border-radius: 12px; 
-      padding: 14px; 
-      text-align: center; 
+    button {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0b0f19;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
     }
-    .room-code-tag { 
-      font-size: 20px; 
-      font-weight: 800; 
-      color: #f59e0b; 
-      user-select: all; 
-      margin: 6px 0; 
-      letter-spacing: 1.5px; 
-      text-transform: uppercase;
+    button:active {
+      transform: scale(0.97);
+      filter: brightness(0.9);
     }
-    .player-list { 
-      list-style: none; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 8px; 
-      margin: 6px 0; 
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .player-item { 
-      display: flex; 
-      align-items: center; 
-      gap: 10px; 
-      background: #0f172a; 
-      padding: 8px 12px; 
-      border-radius: 10px; 
-      border: 1px solid #1e293b; 
-      font-size: 14px; 
-    }
-    .color-dot { 
-      width: 14px; 
-      height: 14px; 
-      border-radius: 50%; 
-      border: 2px solid #ffffff; 
-      flex-shrink: 0; 
+    button:disabled {
+      background: #334155 !important;
+      color: #64748b !important;
+      box-shadow: none !important;
+      transform: none !important;
+      cursor: not-allowed;
     }
 
-    /* Schermata di Gioco */
-    #game-container { 
-      display: none; 
-      flex-direction: column; 
-      align-items: center; 
-      width: 100%; 
-      max-width: 440px; 
-      gap: 8px; 
-      margin-top: 4px; 
+    /* Schermata Iniziale Lobby */
+    #lobby-screen {
+      width: 92%;
+      max-width: 420px;
+      margin-top: auto;
+      margin-bottom: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 100;
     }
-    
-    #status { 
-      width: 100%; 
-      background: #1e293b; 
-      padding: 10px 12px; 
-      border-radius: 10px; 
-      font-size: 13px; 
-      text-align: center; 
-      border-left: 4px solid #f59e0b; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      line-height: 1.4;
+
+    .brand-title {
+      text-align: center;
+      color: var(--gold);
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 12px rgba(245, 158, 11, 0.4);
     }
-    
-    canvas { 
-      background: #090d16; 
-      border: 2px solid #334155; 
-      border-radius: 12px; 
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6); 
-      max-width: 100%;
-      height: auto;
+
+    .character-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 4px 0;
+    }
+    .char-card {
+      background: #0b1120;
+      border: 2px solid #1e293b;
+      border-radius: 10px;
+      padding: 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s;
+      position: relative;
+    }
+    .char-card img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin: 0 auto 4px auto;
+      display: block;
+      border: 2px solid transparent;
+    }
+    .char-card.selected {
+      border-color: var(--gold);
+      background: rgba(245, 158, 11, 0.12);
+      transform: translateY(-2px);
+    }
+    .char-card.selected img {
+      border-color: var(--gold);
+    }
+    .char-card.taken {
+      opacity: 0.35;
+      pointer-events: none;
+      filter: grayscale(1);
+    }
+    .char-name {
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    /* Sala d'Attesa */
+    #waiting-screen {
+      width: 92%;
+      max-width: 420px;
+      margin: auto;
+      padding: 22px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+    }
+    .pass-banner {
+      background: #090e1a;
+      border: 2px dashed var(--gold);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .pass-tag {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--gold);
+      letter-spacing: 2px;
+      margin: 4px 0;
+      user-select: all;
+    }
+
+    /* Schermata Gioco 3D */
+    #game-container {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #threejs-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
       touch-action: none;
     }
 
-    /* Log indagini rapido */
-    #game-log {
-      width: 100%;
-      max-height: 52px;
-      overflow-y: auto;
-      background: #0b1120;
-      border: 1px solid #1e293b;
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-size: 11px;
-      color: #94a3b8;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .log-item { border-bottom: 1px solid #1e293b; padding-bottom: 2px; }
-
-    /* Modali */
-    .modal-overlay { 
-      position: fixed; 
-      top: 0; left: 0; width: 100%; height: 100%; 
-      background: rgba(0,0,0,0.85); 
-      backdrop-filter: blur(4px);
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      z-index: 9999; 
-      padding: 12px; 
-    }
-    .modal-box { 
-      background: #1e293b; 
-      border-radius: 16px; 
-      padding: 16px; 
-      width: 100%; 
-      max-width: 380px; 
-      border: 1px solid #475569; 
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.7);
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    .modal-header {
+    /* HUD Superiore di Gioco */
+    .top-hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 6px;
+      gap: 8px;
+      z-index: 50;
+      pointer-events: none;
     }
-    .close-btn { 
-      background: #334155; 
-      color: #94a3b8; 
-      border-radius: 50%; 
-      width: 30px; 
-      height: 30px; 
-      padding: 0; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      cursor: pointer; 
-      font-size: 16px; 
+    .top-hud > * {
+      pointer-events: auto;
     }
 
-    .card-pill { 
-      background: #0f172a; 
-      border: 1px solid #38bdf8; 
-      padding: 9px 12px; 
-      border-radius: 8px; 
-      font-size: 13px; 
-      font-weight: 600; 
-      color: #e0f2fe;
+    .turn-status-card {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+      border-left: 4px solid var(--gold);
+    }
+
+    .view-toggle-btn {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-dark);
+      color: var(--gold);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Barra Controlli Inferiore Docked */
+    .bottom-dock {
+      position: absolute;
+      bottom: 12px;
+      left: 10px;
+      right: 10px;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 8px;
+      z-index: 50;
+      max-width: 520px;
+      margin: 0 auto;
     }
-    .sheet-row { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      padding: 5px 0; 
-      border-bottom: 1px solid #334155; 
+
+    .action-row {
+      display: flex;
+      gap: 6px;
+      width: 100%;
     }
-    .sheet-status-btn { 
-      width: 36px; 
-      height: 30px; 
-      border-radius: 6px; 
-      font-weight: bold; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
+
+    .utility-row {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .log-bar {
+      max-height: 46px;
+      overflow-y: auto;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.35;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 2px;
+    }
+    .log-entry {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 1px;
+    }
+    .log-highlight {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* Modali Fullscreen e Dialoghi */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 7, 15, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 12px;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 460px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-dark);
+      padding-bottom: 8px;
+    }
+    .close-icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1e293b;
+      color: #cbd5e1;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    /* Taccuino Multi-Colonna Avanzato */
+    .notebook-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .notebook-scroll-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-dark);
+      border-radius: 10px;
+      background: #090e1a;
+      -webkit-overflow-scrolling: touch;
+    }
+    .notebook-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 320px;
+    }
+    .notebook-table th, .notebook-table td {
+      border: 1px solid #1e293b;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    .notebook-table th.col-item-header {
+      text-align: left;
+      font-weight: 700;
+      background: #0f172a;
+      width: 130px;
+      min-width: 130px;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+    }
+    .notebook-table td.item-name-cell {
+      text-align: left;
+      font-weight: 600;
+      background: #090e1a;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      border-right: 2px solid var(--border-dark);
+    }
+    .col-title-input {
+      background: transparent;
+      border: none;
+      color: var(--gold);
+      font-weight: 800;
+      font-size: 11px;
+      text-align: center;
+      padding: 2px;
+      width: 60px;
+      text-transform: uppercase;
+    }
+    .mark-btn {
+      width: 32px;
+      height: 30px;
       padding: 0;
       font-size: 14px;
+      font-weight: 900;
+      border-radius: 6px;
+      margin: 0 auto;
     }
-    .status-none { background: #334155; color: #94a3b8; }
-    .status-no { background: #ef4444; color: #ffffff; }
-    .status-yes { background: #10b981; color: #ffffff; }
-    .status-maybe { background: #f59e0b; color: #000000; }
+    .mark-none { background: #1e293b; color: #64748b; }
+    .mark-no { background: #dc2626; color: #fff; }
+    .mark-yes { background: #10b981; color: #fff; }
+    .mark-maybe { background: #f59e0b; color: #000; }
+    .mark-star { background: #8b5cf6; color: #fff; }
+
+    /* Carte in mano visuali */
+    .cards-flex-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .card-tile {
+      background: #090e1a;
+      border: 1px solid var(--gold);
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .card-tile img {
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      object-fit: cover;
+      margin-bottom: 6px;
+    }
+    .card-tile-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .card-tile-type {
+      font-size: 9px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 1. LOBBY INIZIALE CON PASSWORD COME CODICE STANZA -->
-  <div id="lobby-screen" class="panel">
-    <div style="text-align:center;">
-      <h2 style="color: #f59e0b; letter-spacing: 1.5px; font-weight: 900;">CLUEDO DETECTIVE</h2>
-      <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">WebRTC Peer-to-Peer Edition</p>
+  <!-- 1. LOBBY INIZIALE CON PASSWORD & SCELTA DETECTIVE -->
+  <div id="lobby-screen" class="glass-panel">
+    <div class="brand-title">CLUEDO 3D</div>
+    <div style="text-align: center; font-size: 12px; color: var(--text-muted); margin-top: -8px;">
+      Mansion P2P Investigator
     </div>
-    
-    <input type="text" id="username" placeholder="Il tuo nome / alias" maxlength="16">
-    
-    <div style="display:flex; flex-direction:column; gap:10px; margin-top: 4px;">
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px solid #334155;">
-        <span style="font-size: 11px; color: #f59e0b; font-weight: 700; text-transform: uppercase;">Opzione 1: Crea Stanza</span>
-        <input type="text" id="hostPassword" placeholder="Scegli la password della stanza" style="margin-top: 6px;">
-        <button onclick="createGame()" style="margin-top: 8px;">CREA STANZA</button>
+
+    <div>
+      <label style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Tuo Nome / Alias:</label>
+      <input type="text" id="username" placeholder="Es. Sherlock" maxlength="15" style="margin-top: 4px;">
+    </div>
+
+    <div>
+      <label style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Scegli il tuo Detective:</label>
+      <div id="character-picker" class="character-picker-grid"></div>
+    </div>
+
+    <!-- Opzioni Crea o Entra -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+      <div style="background: rgba(11, 17, 32, 0.7); padding: 10px; border-radius: 10px; border: 1px solid var(--border-dark);">
+        <span style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase;">Stanza Host (Crea)</span>
+        <input type="text" id="hostPassword" placeholder="Scegli password stanza (es. villa123)" style="margin-top: 4px;">
+        <button onclick="createGame()" style="margin-top: 6px;">CREA STANZA 3D</button>
       </div>
-      
-      <div style="text-align:center; font-size: 12px; color: #64748b; font-weight: bold;">OPPURE</div>
-      
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px solid #334155;">
-        <span style="font-size: 11px; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Opzione 2: Entra con Password</span>
-        <input type="text" id="joinPassword" placeholder="Password della stanza creata dall'Host" style="margin-top: 6px;">
-        <button onclick="joinGame()" style="background: #3b82f6; color: #fff; margin-top: 8px;">PARTECIPA</button>
+
+      <div style="text-align: center; font-size: 11px; font-weight: 800; color: #64748b;">OPPURE</div>
+
+      <div style="background: rgba(11, 17, 32, 0.7); padding: 10px; border-radius: 10px; border: 1px solid var(--border-dark);">
+        <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase;">Partecipa da Invitato</span>
+        <input type="text" id="joinPassword" placeholder="Password stanza dell'Host" style="margin-top: 4px;">
+        <button onclick="joinGame()" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; margin-top: 6px;">ENTRA NELLA VILLA</button>
       </div>
     </div>
   </div>
 
   <!-- 2. SALA D'ATTESA -->
-  <div id="waiting-screen" class="panel" style="display: none;">
-    <div class="room-header">
-      <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Password Stanza:</div>
-      <div id="display-room-code" class="room-code-tag">...</div>
-      <span style="font-size: 12px; color: #cbd5e1;">Comunica questa password ai tuoi amici</span>
+  <div id="waiting-screen" class="glass-panel">
+    <div class="pass-banner">
+      <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Password della Stanza:</div>
+      <div id="display-room-code" class="pass-tag">---</div>
+      <div style="font-size: 11px; color: var(--text-muted);">Comunica questa parola d'ordine ai tuoi compagni di gioco</div>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 4px;">
-      <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">Detective connessi:</span>
-      <span id="player-count" style="font-size: 12px; background: #0f172a; padding: 2px 8px; border-radius: 12px; color: #f59e0b;">1/6</span>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 13px; font-weight: 700;">Detective Convocati:</span>
+      <span id="player-count" style="font-size: 12px; background: #0b1120; padding: 2px 8px; border-radius: 12px; color: var(--gold); font-weight: 700;">1/6</span>
     </div>
 
-    <ul id="player-list-ul" class="player-list"></ul>
+    <div id="waiting-players-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto;"></div>
 
-    <div id="host-start-container" style="display: none; margin-top: 4px;">
-      <button onclick="startGame()" style="background: #10b981; color: #0f172a; font-size: 15px; padding: 13px;">▶ AVVIA INDAGINE</button>
+    <div id="host-start-box" style="display: none; margin-top: 4px;">
+      <button onclick="startGame()" style="background: linear-gradient(135deg, #10b981, #059669); color: #042f2e; padding: 14px; font-size: 16px;">
+        ▶ APRI I CANCELLI DELLA VILLA
+      </button>
     </div>
-    <div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; font-style: italic;">
-      In attesa che l'Host avvii la partita...
+    <div id="client-wait-box" style="display: none; text-align: center; font-size: 12px; color: var(--text-muted); font-style: italic;">
+      In attesa che l'Host avvii la sessione investigativa...
     </div>
   </div>
 
-  <!-- 3. SCHERMATA DI GIOCO -->
+  <!-- 3. SCHERMATA GIOCO 3D -->
   <div id="game-container">
-    <div id="status">In attesa dell'inizio...</div>
-    <canvas id="board"></canvas>
-    
-    <!-- Azioni del Turno -->
-    <div style="width: 100%; display: flex; gap: 6px;">
-      <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1.1; font-size: 14px; padding: 10px;">🎲 DADO</button>
-      <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1.2; background: #8b5cf6; color: #fff; font-size: 14px; padding: 10px;">🔍 IPOTESI</button>
-      <button id="secretPassageBtn" onclick="useSecretPassage()" disabled style="flex: 1; background: #0284c7; color: #fff; font-size: 12px; padding: 10px;">🚪 PASSAGGIO</button>
-      <button id="endTurnBtn" onclick="passTurn()" disabled style="flex: 0.9; background: #475569; color: #fff; font-size: 12px; padding: 10px;">PASSA</button>
+    <canvas id="threejs-canvas"></canvas>
+
+    <!-- Top HUD -->
+    <div class="top-hud">
+      <div id="status-display" class="glass-panel turn-status-card">
+        In attesa dell'inizio indagini...
+      </div>
+      <button class="view-toggle-btn glass-panel" onclick="toggle3DView()" title="Cambia visuale 3D/Top-Down">
+        🎥
+      </button>
     </div>
 
-    <!-- Azioni Secondarie: Carte, Taccuino, Accusa Finale -->
-    <div style="display: flex; gap: 6px; width: 100%;">
-      <button onclick="openModal('cards-modal')" style="background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; font-size: 12px; padding: 8px;">🎴 Mie Carte (<span id="my-cards-count">0</span>)</button>
-      <button onclick="openModal('sheet-modal')" style="background: #1e293b; color: #fbbf24; border: 1px solid #d97706; font-size: 12px; padding: 8px;">📝 Taccuino</button>
-      <button id="accuseBtn" onclick="openAccusationModal()" disabled style="background: #dc2626; color: #fff; font-size: 12px; padding: 8px;">⚖️ ACCUSA FINALE</button>
-    </div>
+    <!-- Barra Controlli Inferiore Docked -->
+    <div class="bottom-dock">
+      <!-- Azioni Primarie -->
+      <div class="action-row">
+        <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1.1; font-size: 13px; padding: 11px;">🎲 DADO</button>
+        <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1.3; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; font-size: 13px; padding: 11px;">🔍 IPOTESI</button>
+        <button id="passageBtn" onclick="useSecretPassage()" disabled style="flex: 1; background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; font-size: 11px; padding: 11px;">🚪 PASSAGGIO</button>
+        <button id="passTurnBtn" onclick="passTurn()" disabled style="flex: 0.9; background: #334155; color: #fff; font-size: 12px; padding: 11px;">PASSA</button>
+      </div>
 
-    <!-- Registro Eventi -->
-    <div id="game-log"></div>
+      <!-- Azioni Utility -->
+      <div class="utility-row">
+        <button onclick="openModal('cards-modal')" class="glass-panel" style="flex: 1; background: #0b1120; color: #38bdf8; border: 1px solid #0284c7; font-size: 11px; padding: 9px;">
+          🎴 CARTE (<span id="my-cards-count">0</span>)
+        </button>
+        <button onclick="openModal('notebook-modal')" class="glass-panel" style="flex: 1.2; background: #0b1120; color: var(--gold); border: 1px solid #d97706; font-size: 11px; padding: 9px;">
+          📝 TACCUINO (+)
+        </button>
+        <button id="accuseBtn" onclick="openAccusationModal()" class="glass-panel" disabled style="flex: 1.2; background: linear-gradient(135deg, #dc2626, #b91c1c); color: #fff; font-size: 11px; padding: 9px;">
+          ⚖️ ACCUSA
+        </button>
+      </div>
+
+      <!-- Feed Registro Indagini -->
+      <div id="game-log" class="glass-panel log-bar"></div>
+    </div>
   </div>
 
   <!-- MODALE FORMULA IPOTESI -->
-  <div id="suggest-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 style="color: #a78bfa; font-size: 16px;">🔍 Formula Ipotesi</h3>
-        <button class="close-btn" onclick="closeModal('suggest-modal')">&times;</button>
+  <div id="suggest-modal" class="modal-overlay">
+    <div class="modal-card glass-panel">
+      <div class="modal-head">
+        <h3 style="color: var(--accent); font-size: 16px;">🔍 Formula Ipotesi Ufficiale</h3>
+        <button class="close-icon-btn" onclick="closeModal('suggest-modal')">&times;</button>
       </div>
-      <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">
-        Ti trovi in: <strong id="suggest-current-room-label" style="color: #f59e0b;">-</strong>
+      <div style="font-size: 12px; color: var(--text-muted);">
+        Luogo attuale dell'interrogatorio: <strong id="suggest-room-name" style="color: var(--gold);">-</strong>
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Sospettato:</label>
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Chi sospetti?</label>
           <select id="suggestSuspect" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Arma:</label>
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Quale arma del delitto?</label>
           <select id="suggestWeapon" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Stanza (fissata):</label>
-          <input type="text" id="suggestRoomDisplay" disabled style="margin-top: 4px; color: #94a3b8;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Stanza (vincolata al luogo):</label>
+          <input type="text" id="suggestRoomDisplay" disabled style="margin-top: 4px; opacity: 0.8;">
         </div>
-        <button onclick="submitSuggestion()" style="background: #8b5cf6; color: #fff; margin-top: 6px; padding: 12px;">INTERROGA I DETECTIVE</button>
+        <p style="font-size: 10px; color: var(--text-muted); line-height: 1.3;">
+          * Regola Ufficiale: la pedina del sospettato interrogato verrà convocata immediatamente in questa stanza.
+        </p>
+        <button onclick="submitSuggestion()" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; margin-top: 4px; padding: 13px;">
+          INTERROGA GLI INVESTIGATORI
+        </button>
       </div>
     </div>
   </div>
 
   <!-- MODALE ACCUSA FINALE -->
-  <div id="accuse-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box" style="border-color: #ef4444;">
-      <div class="modal-header">
-        <h3 style="color: #ef4444; font-size: 16px;">⚖️ ACCUSA FINALE</h3>
-        <button class="close-btn" onclick="closeModal('accuse-modal')">&times;</button>
+  <div id="accuse-modal" class="modal-overlay">
+    <div class="modal-card glass-panel" style="border-color: var(--crimson);">
+      <div class="modal-head">
+        <h3 style="color: var(--crimson); font-size: 16px;">⚖️ ACCUSA FINALE DEFINITIVA</h3>
+        <button class="close-icon-btn" onclick="closeModal('accuse-modal')">&times;</button>
       </div>
-      <p style="font-size: 12px; color: #fca5a5; margin-bottom: 8px; line-height: 1.4;">
-        ⚠️ Attenzione: Se indovini vinci subito la partita! Se sbagli anche un solo elemento, vieni <strong>eliminato</strong> e potrai solo mostrare carte agli altri.
-      </p>
+      <div style="background: rgba(239, 68, 68, 0.15); border-left: 3px solid var(--crimson); padding: 8px; border-radius: 6px; font-size: 11px; line-height: 1.4;">
+        ⚠️ <strong>Attenzione detective:</strong> L'accusa finale si effettua una sola volta! Se la busta segreta coincide, vinci la partita. Se sbagli anche solo una carta, vieni <strong>eliminato</strong> e potrai solo mostrare carte per gli altri.
+      </div>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Il Colpevole:</label>
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">L'Assassino:</label>
           <select id="accuseSuspect" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">L'Arma del Delitto:</label>
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">L'Arma usata:</label>
           <select id="accuseWeapon" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Il Luogo del Delitto:</label>
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Il Luogo del Delitto:</label>
           <select id="accuseRoom" style="margin-top: 4px;"></select>
         </div>
-        <button onclick="submitAccusation()" style="background: #dc2626; color: #fff; margin-top: 6px; padding: 12px; font-weight: 800;">CONFERMA ACCUSA UFFICIALE</button>
+        <button onclick="submitAccusation()" style="background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; margin-top: 6px; padding: 13px;">
+          APRI LA BUSTA SEGRETA
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- MODALE RISPOSTA CHIAMATA -->
-  <div id="disprove-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 style="color: #f59e0b; font-size: 16px;">Sei stato interrogato!</h3>
+  <!-- MODALE RISPOSTA CHIAMATA (DISPROVE) -->
+  <div id="disprove-modal" class="modal-overlay">
+    <div class="modal-card glass-panel">
+      <div class="modal-head">
+        <h3 style="color: var(--gold); font-size: 16px;">Sei sotto interrogatorio!</h3>
       </div>
-      <div id="disprove-banner" style="background: #0f172a; border-left: 4px solid #8b5cf6; padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
-      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Scegli quale carta mostrare in segreto:</div>
+      <div id="disprove-banner" style="background: #090e1a; border-left: 4px solid var(--accent); padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.4;"></div>
+      <div style="font-size: 12px; font-weight: 700; margin-top: 4px;">Scegli una carta da mostrare in segreto:</div>
       <div id="disprove-cards-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
-      <button id="disprove-none-btn" onclick="passDisprove()" style="background: #475569; color: #fff; margin-top: 12px; font-size: 13px; padding: 10px;">NON HO NESSUNA CARTA</button>
+      <button id="disprove-none-btn" onclick="passDisprove()" style="background: #334155; color: #fff; margin-top: 8px; font-size: 12px; padding: 10px;">
+        NON HO NESSUNA DI QUESTE CARTE
+      </button>
     </div>
   </div>
 
   <!-- MODALE LE MIE CARTE -->
-  <div id="cards-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 style="color: #38bdf8; font-size: 16px;">🎴 Le Mie Carte Segrete</h3>
-        <button class="close-btn" onclick="closeModal('cards-modal')">&times;</button>
+  <div id="cards-modal" class="modal-overlay">
+    <div class="modal-card glass-panel">
+      <div class="modal-head">
+        <h3 style="color: #38bdf8; font-size: 16px;">🎴 La Tua Mano Segreta</h3>
+        <button class="close-icon-btn" onclick="closeModal('cards-modal')">&times;</button>
       </div>
-      <p style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Queste carte sono in tuo possesso (quindi innocenti):</p>
-      <div id="my-cards-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      <div style="font-size: 11px; color: var(--text-muted);">Queste carte sono in tuo possesso (quindi innocenti ed escluse dal delitto):</div>
+      <div id="my-cards-container" class="cards-flex-grid"></div>
     </div>
   </div>
 
-  <!-- MODALE TACCUINO -->
-  <div id="sheet-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 style="color: #fbbf24; font-size: 16px;">📝 Taccuino del Detective</h3>
-        <button class="close-btn" onclick="closeModal('sheet-modal')">&times;</button>
-      </div>
-      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px; display: flex; gap: 8px; justify-content: center;">
-        <span>· Vuoto</span> <span>✕ Escluso</span> <span style="color:#10b981;">✓ Certo</span> <span style="color:#f59e0b;">? Dubbio</span>
+  <!-- MODALE TACCUINO MULTI-COLONNA (ADVANCED DETECTIVE NOTEBOOK) -->
+  <div id="notebook-modal" class="modal-overlay">
+    <div class="modal-card glass-panel" style="max-width: 580px;">
+      <div class="modal-head">
+        <h3 style="color: var(--gold); font-size: 16px;">📝 Taccuino Investigativo Professionale</h3>
+        <button class="close-icon-btn" onclick="closeModal('notebook-modal')">&times;</button>
       </div>
       
-      <div style="font-size: 13px; font-weight: 700; color: #a78bfa; margin: 8px 0 4px;">👤 SOSPETTATI</div>
-      <div id="suspects-notebook"></div>
+      <div class="notebook-controls">
+        <span style="font-size: 10px; color: var(--text-muted);">Tocca le celle per cambiare spunta:</span>
+        <div style="display: flex; gap: 4px;">
+          <button onclick="addNotebookColumn()" style="background: #1e293b; color: var(--gold); border: 1px solid var(--gold); padding: 4px 8px; font-size: 11px; border-radius: 6px; width: auto;">
+            + Nuova Colonna
+          </button>
+          <button onclick="removeLastNotebookColumn()" style="background: #1e293b; color: var(--crimson); border: 1px solid var(--crimson); padding: 4px 8px; font-size: 11px; border-radius: 6px; width: auto;">
+            - Elimina
+          </button>
+        </div>
+      </div>
 
-      <div style="font-size: 13px; font-weight: 700; color: #f87171; margin: 12px 0 4px;">🔪 ARMI</div>
-      <div id="weapons-notebook"></div>
+      <div style="display: flex; gap: 8px; justify-content: center; font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">
+        <span>· Vuoto</span> <span><strong style="color:#ef4444;">✕</strong> No</span> <span><strong style="color:#10b981;">✓</strong> Sì</span> <span><strong style="color:#f59e0b;">?</strong> Forse</span> <span><strong style="color:#8b5cf6;">★</strong> Delitto</span>
+      </div>
 
-      <div style="font-size: 13px; font-weight: 700; color: #60a5fa; margin: 12px 0 4px;">🚪 STANZE</div>
-      <div id="rooms-notebook"></div>
+      <div class="notebook-scroll-wrap">
+        <table class="notebook-table">
+          <thead>
+            <tr id="notebook-table-header"></tr>
+          </thead>
+          <tbody id="notebook-table-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- MODALE ALERT PERSONALIZZATO -->
-  <div id="custom-alert-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box" style="text-align: center;">
+  <!-- MODALE AVVISI CUSTOM -->
+  <div id="custom-alert-modal" class="modal-overlay">
+    <div class="modal-card glass-panel" style="text-align: center; max-width: 380px;">
       <div id="custom-alert-msg" style="font-size: 14px; line-height: 1.5; margin: 10px 0 16px; white-space: pre-line;"></div>
-      <button onclick="closeModal('custom-alert-modal')" style="background: #f59e0b; color: #000; font-weight: 700; padding: 10px;">HO CAPITO</button>
+      <button onclick="closeModal('custom-alert-modal')" style="background: var(--gold); color: #000; font-weight: 800; padding: 10px;">HO CAPITO</button>
     </div>
   </div>
 
   <script>
-    // --- AUDIO SYSTEM (Web Audio API nativa senza file esterni) ---
-    const AudioSys = {
-      ctx: null,
-      init() {
-        if (!this.ctx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) this.ctx = new AudioContext();
-        }
+    /* =====================================================================
+       1. DATABASE PERSONAGGI, ARMI, STANZE E ASSETS GRAFICI
+       ===================================================================== */
+    const CHARACTERS_DB = [
+      {
+        id: 'scarlett',
+        name: 'Miss Scarlett',
+        color: '#dc2626',
+        hex: 0xdc2626,
+        spawn: { x: 3, y: 0 },
+        img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+        bio: 'Astuta e determinata, non lascia mai nulla al caso.'
       },
-      play(freq, type, duration, vol = 0.1) {
-        try {
-          this.init();
-          if (!this.ctx) return;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = type;
-          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start();
-          osc.stop(this.ctx.currentTime + duration);
-        } catch(e) {}
+      {
+        id: 'mustard',
+        name: 'Colonnello Mustard',
+        color: '#eab308',
+        hex: 0xeab308,
+        spawn: { x: 8, y: 0 },
+        img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+        bio: 'Veterano decorato, esperto di armi e tattica da campo.'
       },
-      dice() { this.play(340, 'triangle', 0.15, 0.2); setTimeout(() => this.play(440, 'triangle', 0.2, 0.2), 120); },
-      alert() { this.play(520, 'sine', 0.25, 0.2); setTimeout(() => this.play(680, 'sine', 0.35, 0.2), 150); },
-      victory() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => this.play(f, 'square', 0.3, 0.15), i * 150)); }
-    };
+      {
+        id: 'orchid',
+        name: 'Dottor Orchid',
+        color: '#ec4899',
+        hex: 0xec4899,
+        spawn: { x: 0, y: 3 },
+        img: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
+        bio: 'Genio della biologia molecolare e delle tossine letali.'
+      },
+      {
+        id: 'green',
+        name: 'Reverendo Green',
+        color: '#10b981',
+        hex: 0x10b981,
+        spawn: { x: 11, y: 3 },
+        img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+        bio: 'Uomo di chiesa misterioso dalle amicizie influenti.'
+      },
+      {
+        id: 'peacock',
+        name: 'Signora Peacock',
+        color: '#0ea5e9',
+        hex: 0x0ea5e9,
+        spawn: { x: 0, y: 7 },
+        img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+        bio: 'Aristocratica dal portamento fiero e dal passato segreto.'
+      },
+      {
+        id: 'plum',
+        name: 'Professor Plum',
+        color: '#8b5cf6',
+        hex: 0x8b5cf6,
+        spawn: { x: 11, y: 7 },
+        img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&q=80',
+        bio: 'Archeologo e storico specializzato in reliquie oscure.'
+      }
+    ];
 
-    // --- CARTE E STRUTTURA DEL TABELLONE ---
     const ALL_CARDS = {
-      suspects: ['Miss Scarlett', 'Colonnello Mustard', 'Dottor Orchid', 'Reverendo Green', 'Signora Peacock', 'Professor Plum'],
+      suspects: CHARACTERS_DB.map(c => c.name),
       weapons: ['Candeliere', 'Pugnale', 'Tubo di Piombo', 'Rivoltella', 'Corda', 'Chiave Inglese'],
       rooms: ['Cucina', 'Sala da Ballo', 'Veranda', 'Sala da Pranzo', 'Sala da Biliardo', 'Salotto', 'Studio', 'Biblioteca', 'Ingresso']
     };
 
-    // Mappa Ufficiale 12x12
-    // 0: Corridoio calpestabile, 1: Muro/Inaccessibile, 2: Cucina, 3: Sala da Ballo, 4: Veranda,
-    // 5: Sala da Pranzo, 6: Sala da Biliardo, 7: Salotto, 8: Studio, 9: Biblioteca, 10: Ingresso
     const ROOM_NAMES = {
       2: 'Cucina', 3: 'Sala da Ballo', 4: 'Veranda',
       5: 'Sala da Pranzo', 6: 'Sala da Biliardo', 7: 'Salotto',
@@ -486,9 +758,9 @@
     };
 
     const ROOM_COLORS = {
-      2: '#78350f', 3: '#4c1d95', 4: '#14532d',
-      5: '#831843', 6: '#1e3a8a', 7: '#854d0e',
-      8: '#701a75', 9: '#065f46', 10: '#334155'
+      2: 0x78350f, 3: 0x4c1d95, 4: 0x14532d,
+      5: 0x831843, 6: 0x1e3a8a, 7: 0x854d0e,
+      8: 0x701a75, 9: 0x065f46, 10: 0x334155
     };
 
     const BOARD_GRID = [
@@ -506,7 +778,6 @@
       [0, 8, 8, 8, 0, 0, 0, 0, 8, 8, 8, 0]
     ];
 
-    // Coordinate Porte di accesso (x, y) per entrare/uscire
     const ROOM_DOORS = [
       { room: 'Cucina', x: 2, y: 3 },
       { room: 'Sala da Ballo', x: 5, y: 3 },
@@ -519,7 +790,6 @@
       { room: 'Studio', x: 3, y: 11 }
     ];
 
-    // Passaggi Segreti tra gli angoli opposti
     const SECRET_PASSAGES = {
       'Cucina': { targetRoom: 'Studio', spawn: { x: 2, y: 11 } },
       'Studio': { targetRoom: 'Cucina', spawn: { x: 1, y: 1 } },
@@ -527,13 +797,55 @@
       'Salotto': { targetRoom: 'Veranda', spawn: { x: 10, y: 1 } }
     };
 
-    // --- VARIABILI DI STATO ---
+    /* =====================================================================
+       2. AUDIO SYNTHESIZER NATIVO (Zero dipendenze esterne)
+       ===================================================================== */
+    const SoundEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      tone(freq, type, dur, vol = 0.1) {
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + dur);
+        } catch(e) {}
+      },
+      dice() {
+        this.tone(300, 'triangle', 0.12, 0.2);
+        setTimeout(() => this.tone(420, 'triangle', 0.16, 0.2), 90);
+        setTimeout(() => this.tone(540, 'sine', 0.2, 0.2), 180);
+      },
+      step() { this.tone(180, 'sine', 0.08, 0.15); },
+      door() { this.tone(220, 'sawtooth', 0.25, 0.1); setTimeout(() => this.tone(330, 'triangle', 0.3, 0.15), 100); },
+      alert() { this.tone(520, 'sine', 0.25, 0.2); setTimeout(() => this.tone(700, 'sine', 0.35, 0.2), 140); },
+      secret() { [320, 380, 440, 520].forEach((f, i) => setTimeout(() => this.tone(f, 'sine', 0.3, 0.12), i * 80)); },
+      win() { [523, 659, 783, 1046, 1318].forEach((f, i) => setTimeout(() => this.tone(f, 'square', 0.35, 0.2), i * 140)); }
+    };
+
+    /* =====================================================================
+       3. VARIABILI DI STATO E DI RETE PEERJS
+       ===================================================================== */
     let peer = null;
     let isHost = false;
     let connections = [];
     let hostConn = null;
     let myId = null;
     let myName = '';
+    let selectedCharId = 'scarlett';
     let currentRoomCode = '';
 
     let gameState = {
@@ -548,14 +860,10 @@
 
     let myCards = [];
     let secretCaseFile = null;
-    let notebookState = {};
 
-    const GRID_SIZE = 12;
-    const canvas = document.getElementById('board');
-    const ctx = canvas.getContext('2d');
-    let tileSize = 28;
-
-    const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+    // Struttura Taccuino Multi-Colonna Avanzato
+    let notebookColumns = ['Io', 'Sospetti'];
+    let notebookMatrix = {}; // key: item -> array di stati
 
     const PEER_CONFIG = {
       config: {
@@ -566,20 +874,59 @@
       }
     };
 
-    // Helper per normalizzare la password come Peer ID univoco
     function formatPeerIdFromPassword(pass) {
       const sanitized = pass.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return `cluedo-room-${sanitized}`;
+      return `cluedo-3d-room-${sanitized}`;
     }
 
-    // 1. CREAZIONE STANZA (HOST)
+    /* =====================================================================
+       4. SELEZIONE PERSONAGGI IN LOBBY
+       ===================================================================== */
+    function renderCharacterPicker() {
+      const container = document.getElementById('character-picker');
+      container.innerHTML = '';
+
+      CHARACTERS_DB.forEach(c => {
+        const div = document.createElement('div');
+        div.className = `char-card ${selectedCharId === c.id ? 'selected' : ''}`;
+        div.id = `char-card-${c.id}`;
+
+        const img = document.createElement('img');
+        img.src = c.img;
+        img.onerror = () => {
+          // Fallback con icona SVG colorata se offline o link bloccato
+          img.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="${encodeURIComponent(c.color)}"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/></svg>`;
+        };
+
+        const span = document.createElement('div');
+        span.className = 'char-name';
+        span.textContent = c.name;
+        span.style.color = c.color;
+
+        div.appendChild(img);
+        div.appendChild(span);
+
+        div.onclick = () => {
+          selectedCharId = c.id;
+          document.querySelectorAll('.char-card').forEach(el => el.classList.remove('selected'));
+          div.classList.add('selected');
+        };
+
+        container.appendChild(div);
+      });
+    }
+    renderCharacterPicker();
+
+    /* =====================================================================
+       5. CREAZIONE E ACCESSO STANZA P2P
+       ===================================================================== */
     function createGame() {
-      AudioSys.init();
-      myName = document.getElementById('username').value.trim() || 'Host';
+      SoundEngine.init();
+      myName = document.getElementById('username').value.trim() || 'Detective Host';
       const rawPass = document.getElementById('hostPassword').value.trim();
 
       if (!rawPass) {
-        showCustomAlert('Inserisci una password per identificare la stanza!');
+        showCustomAlert('Inserisci una password per proteggere la stanza della Villa!');
         return;
       }
 
@@ -589,32 +936,38 @@
 
       showWaitingScreen();
       document.getElementById('display-room-code').textContent = currentRoomCode;
-      document.getElementById('host-start-container').style.display = 'block';
+      document.getElementById('host-start-box').style.display = 'block';
 
       try {
         peer = new Peer(peerId, PEER_CONFIG);
       } catch (err) {
-        showCustomAlert('Errore inizializzazione PeerJS.');
+        showCustomAlert('Errore inizializzazione WebRTC PeerJS.');
         return;
       }
 
       peer.on('open', (id) => {
         myId = id;
+        const charObj = CHARACTERS_DB.find(c => c.id === selectedCharId);
+
         gameState.players = [{
           id: myId,
           name: myName,
-          color: COLORS[0],
-          x: 3,
-          y: 0,
+          charId: charObj.id,
+          charName: charObj.name,
+          color: charObj.color,
+          hex: charObj.hex,
+          x: charObj.spawn.x,
+          y: charObj.spawn.y,
           isHost: true,
           eliminated: false
         }];
+
         updateWaitingRoomUI();
       });
 
       peer.on('error', (err) => {
         if (err.type === 'unavailable-id') {
-          showCustomAlert('Questa password è già in uso da un\'altra stanza attiva. Scegline un\'altra!');
+          showCustomAlert('Questa password è già occupata da un\'altra villa attiva!\nScegli una password diversa.');
           document.getElementById('waiting-screen').style.display = 'none';
           document.getElementById('lobby-screen').style.display = 'flex';
         } else {
@@ -638,14 +991,13 @@
       });
     }
 
-    // 2. ACCESSO ALLA STANZA (CLIENT)
     function joinGame() {
-      AudioSys.init();
-      myName = document.getElementById('username').value.trim() || 'Detective';
+      SoundEngine.init();
+      myName = document.getElementById('username').value.trim() || 'Detective Ospite';
       const enteredPass = document.getElementById('joinPassword').value.trim();
 
       if (!enteredPass) {
-        showCustomAlert('Inserisci la password della stanza creata dall\'Host');
+        showCustomAlert('Digita la password della stanza impostata dall\'Host.');
         return;
       }
 
@@ -655,7 +1007,7 @@
       isHost = false;
       showWaitingScreen();
       document.getElementById('display-room-code').textContent = currentRoomCode;
-      document.getElementById('client-waiting-msg').style.display = 'block';
+      document.getElementById('client-wait-box').style.display = 'block';
 
       peer = new Peer(PEER_CONFIG);
 
@@ -664,7 +1016,11 @@
         hostConn = peer.connect(targetPeerId, { reliable: true });
 
         hostConn.on('open', () => {
-          hostConn.send({ type: 'JOIN', name: myName });
+          hostConn.send({
+            type: 'JOIN',
+            name: myName,
+            charId: selectedCharId
+          });
         });
 
         hostConn.on('data', (data) => {
@@ -672,7 +1028,8 @@
             gameState = data.state;
             if (gameState.started) {
               showGameView();
-              updateUI();
+              update3DBoard();
+              updateHUD();
             } else {
               updateWaitingRoomUI();
             }
@@ -683,7 +1040,7 @@
             initNotebook();
           }
           if (data.type === 'PROMPT_DISPROVE') {
-            AudioSys.alert();
+            SoundEngine.alert();
             openDisproveModal(data.suggestion);
           }
           if (data.type === 'SUGGESTION_RESULT') {
@@ -693,13 +1050,13 @@
             addGameLog(data.text);
           }
           if (data.type === 'GAME_OVER') {
-            AudioSys.victory();
+            SoundEngine.win();
             showCustomAlert(data.message);
           }
         });
 
         hostConn.on('error', () => {
-          showCustomAlert('Impossibile trovare la stanza con questa password.');
+          showCustomAlert('Impossibile collegarsi alla villa con questa password.');
         });
       });
 
@@ -708,30 +1065,34 @@
       });
     }
 
-    // 3. LOGICA DI GIOCO SUL TELEFONO DELL'HOST
+    /* =====================================================================
+       6. LOGICA DI GIOCO SUL DISPOSITIVO DELL'HOST
+       ===================================================================== */
     function handleIncomingMessageAsHost(data, conn) {
       if (data.type === 'JOIN') {
-        const pIndex = gameState.players.length;
-        const color = COLORS[pIndex % COLORS.length];
-        const spawns = [
-          {x: 3, y: 0}, {x: 8, y: 0}, {x: 0, y: 3},
-          {x: 11, y: 3}, {x: 0, y: 7}, {x: 11, y: 7}
-        ];
-        const spawn = spawns[pIndex % spawns.length];
+        // Assegna il personaggio scelto oppure il primo libero se già preso
+        let chosen = CHARACTERS_DB.find(c => c.id === data.charId);
+        const isTaken = gameState.players.some(p => p.charId === chosen.id);
+        if (isTaken) {
+          chosen = CHARACTERS_DB.find(c => !gameState.players.some(p => p.charId === c.id)) || CHARACTERS_DB[0];
+        }
 
         gameState.players.push({
           id: conn.peer,
           name: data.name,
-          color: color,
-          x: spawn.x,
-          y: spawn.y,
+          charId: chosen.id,
+          charName: chosen.name,
+          color: chosen.color,
+          hex: chosen.hex,
+          x: chosen.spawn.x,
+          y: chosen.spawn.y,
           isHost: false,
           eliminated: false
         });
 
         broadcastState();
         updateWaitingRoomUI();
-        broadcastLog(`Detective ${data.name} è entrato nell'indagine.`);
+        broadcastLog(`L'investigatore ${data.name} (${chosen.name}) è giunto alla Villa.`);
       }
 
       if (data.type === 'ACTION_ROLL') {
@@ -773,14 +1134,19 @@
 
     function startGame() {
       if (!isHost) return;
-      if (gameState.players.length < 1) return showCustomAlert('Attendi almeno un altro detective');
+      if (gameState.players.length < 1) {
+        showCustomAlert('Attendi almeno un altro detective per iniziare le indagini!');
+        return;
+      }
 
       distributeCardsAndSetCaseFile();
       gameState.started = true;
       broadcastState();
       showGameView();
-      updateUI();
-      broadcastLog('L\'indagine ha inizio! Il delitto è stato commesso nella Villa.');
+      init3DScene();
+      update3DBoard();
+      updateHUD();
+      broadcastLog('L\'indagine è aperta! Un delitto è stato consumato nella Villa.');
     }
 
     function distributeCardsAndSetCaseFile() {
@@ -830,20 +1196,22 @@
       const activePlayer = gameState.players[gameState.turnIndex];
       if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || activePlayer.eliminated) return;
 
-      if (targetX < 0 || targetX >= GRID_SIZE || targetY < 0 || targetY >= GRID_SIZE) return;
+      if (targetX < 0 || targetX >= 12 || targetY < 0 || targetY >= 12) return;
 
       const targetCell = BOARD_GRID[targetY][targetX];
-      if (targetCell === 1) return; // Muro inaccessibile
+      if (targetCell === 1) return; // Muro interno inaccessibile
+
+      // Regola: non puoi calpestare una casella corridoio già occupata da un altro detective
+      const isOccupiedCorridor = targetCell === 0 && gameState.players.some(p => p.x === targetX && p.y === targetY && p.id !== playerId);
+      if (isOccupiedCorridor) return;
 
       const currentCell = BOARD_GRID[activePlayer.y][activePlayer.x];
       const dx = Math.abs(activePlayer.x - targetX);
       const dy = Math.abs(activePlayer.y - targetY);
 
       if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-        // Se si passa da/a una stanza, controlla che avvenga attraverso una porta valida
+        // Regola Porte: l'ingresso/uscita dalle stanze deve avvenire tramite le porte ufficiali
         const enteringRoom = currentCell === 0 && targetCell > 1;
-        const exitingRoom = currentCell > 1 && targetCell === 0;
-
         if (enteringRoom) {
           const roomName = ROOM_NAMES[targetCell];
           const isDoor = ROOM_DOORS.some(d => d.room === roomName && d.x === targetX && d.y === targetY);
@@ -853,11 +1221,13 @@
         activePlayer.x = targetX;
         activePlayer.y = targetY;
         gameState.stepsLeft--;
+        SoundEngine.step();
 
         const inRoom = getPlayerCurrentRoom(activePlayer);
         if (inRoom) {
+          SoundEngine.door();
           broadcastLog(`${activePlayer.name} è entrato in ${inRoom}.`);
-          gameState.stepsLeft = 0; // Entrare in una stanza consuma i passi rimanenti
+          gameState.stepsLeft = 0; // Entrare in una stanza consuma il movimento
         }
 
         if (isHost) broadcastState();
@@ -875,6 +1245,7 @@
         activePlayer.x = passage.spawn.x;
         activePlayer.y = passage.spawn.y;
         gameState.stepsLeft = 0;
+        SoundEngine.secret();
         broadcastLog(`${activePlayer.name} ha usato il passaggio segreto: ${currentRoom} ➔ ${passage.targetRoom}!`);
         if (isHost) broadcastState();
       }
@@ -891,7 +1262,9 @@
       broadcastState();
     }
 
-    // --- FORMULAZIONE IPOTESI (CHIAMATA IN SENSO ORARIO) ---
+    /* =====================================================================
+       7. IPOTESI UFFICIALE & CONVOCAZIONE SOSPETTATO
+       ===================================================================== */
     function initiateSuggestion(callerId, suggestion) {
       const callerIndex = gameState.players.findIndex(p => p.id === callerId);
       if (callerIndex === -1) return;
@@ -903,6 +1276,15 @@
         currentRespondentIndex: (callerIndex + 1) % gameState.players.length,
         startIndex: callerIndex
       };
+
+      // REGOLA UFFICIALE: Sposta la pedina del sospettato interrogato nella stanza dell'ipotesi
+      const summonedChar = gameState.players.find(p => p.charName === suggestion.suspect);
+      if (summonedChar) {
+        const callerPlayer = gameState.players[callerIndex];
+        summonedChar.x = callerPlayer.x;
+        summonedChar.y = callerPlayer.y;
+        broadcastLog(`La pedina di ${summonedChar.charName} è stata convocata in ${suggestion.room}!`);
+      }
 
       broadcastLog(`${gameState.players[callerIndex].name} ipotizza: ${suggestion.suspect} con ${suggestion.weapon} in ${suggestion.room}`);
       broadcastState();
@@ -929,7 +1311,7 @@
           responderName: null
         });
 
-        broadcastLog(`Nessuno ha potuto smentire l'ipotesi di ${act.callerName}!`);
+        broadcastLog(`Nessun investigatore ha potuto smentire l'ipotesi di ${act.callerName}!`);
         endSuggestionTurn();
         return;
       }
@@ -937,7 +1319,7 @@
       const targetPlayer = gameState.players[act.currentRespondentIndex];
 
       if (targetPlayer.id === myId) {
-        AudioSys.alert();
+        SoundEngine.alert();
         openDisproveModal(act.suggestion);
       } else {
         const conn = connections.find(c => c.peer === targetPlayer.id);
@@ -984,7 +1366,9 @@
       nextTurn();
     }
 
-    // --- ACCUSA FINALE (VITTORIA / SCONFITTA) ---
+    /* =====================================================================
+       8. ACCUSA FINALE (VITTORIA O ELIMINAZIONE)
+       ===================================================================== */
     function processAccusation(playerId, accusation) {
       const player = gameState.players.find(p => p.id === playerId);
       if (!player || !secretCaseFile) return;
@@ -998,22 +1382,15 @@
       if (isCorrect) {
         gameState.gameOver = true;
         gameState.winnerName = player.name;
-        const winMsg = `🏆 CASO RISOLTO!\n${player.name} ha scoperto la verità:\nColpevole: ${secretCaseFile.suspect}\nArma: ${secretCaseFile.weapon}\nLuogo: ${secretCaseFile.room}`;
+        const winMsg = `🏆 CASO RISOLTO!\n${player.name} ha scoperto la verità assoluta:\nAssassino: ${secretCaseFile.suspect}\nArma: ${secretCaseFile.weapon}\nLuogo: ${secretCaseFile.room}`;
         
         broadcast({ type: 'GAME_OVER', message: winMsg });
         showCustomAlert(winMsg);
-        AudioSys.victory();
+        SoundEngine.win();
       } else {
         player.eliminated = true;
-        broadcastLog(`❌ ${player.name} ha formulato un'accusa errata ed è stato ELIMINATO!`);
-        sendToPlayer(playerId, {
-          type: 'SUGGESTION_RESULT',
-          callerId: playerId,
-          disproved: false,
-          card: null,
-          responderName: null
-        });
-        showCustomAlert(`La tua accusa era errata! Sei stato eliminato dalla corsa alla vittoria, ma rimarrai nel tavolo per mostrare le carte agli altri detective.`);
+        broadcastLog(`❌ ${player.name} ha formulato un'accusa errata ed è stato ELIMINATO dalle indagini attive!`);
+        showCustomAlert('La tua accusa era errata!\nSei stato eliminato, ma rimarrai nel tavolo per mostrare le carte agli altri detective.');
         nextTurn();
       }
     }
@@ -1049,22 +1426,25 @@
 
     function broadcastState() {
       broadcast({ type: 'SYNC', state: gameState });
-      if (gameState.started) updateUI();
+      if (gameState.started) {
+        update3DBoard();
+        updateHUD();
+      }
     }
 
     function handleSuggestionResult(data) {
       if (data.callerId === myId) {
         if (data.disproved) {
-          AudioSys.alert();
+          SoundEngine.alert();
           showCustomAlert(`🕵️ ${data.responderName} ti ha mostrato in segreto la carta:\n👉 [ ${data.card} ]`);
         } else {
           showCustomAlert(`🔍 Nessun detective ha potuto smentire la tua ipotesi!\nNessuno possiede quelle 3 carte.`);
         }
       } else {
         if (data.disproved) {
-          showCustomAlert(`ℹ️ ${data.responderName} ha mostrato una carta segreta a chi ha fatto la chiamata.`);
+          showCustomAlert(`ℹ️ ${data.responderName} ha smentito l'ipotesi mostrando una carta in privato.`);
         } else {
-          showCustomAlert(`ℹ️ Nessun detective ha potuto smentire l'ipotesi.`);
+          showCustomAlert(`ℹ️ Nessun detective possiede le carte dell'ipotesi.`);
         }
       }
     }
@@ -1072,14 +1452,402 @@
     function addGameLog(text) {
       const logDiv = document.getElementById('game-log');
       const item = document.createElement('div');
-      item.className = 'log-item';
-      item.textContent = text;
+      item.className = 'log-entry';
+      item.innerHTML = text;
       logDiv.prepend(item);
     }
 
-    // --- AZIONI CLIENT ---
+    /* =====================================================================
+       9. MOTORE GRAFICO 3D CON THREE.JS (VILLA TUDOR, LUCI & RAYCASTING)
+       ===================================================================== */
+    let scene, camera, renderer, raycaster, mouse;
+    let boardTiles3D = [];
+    let playerPawns3D = {};
+    let isTopDownView = false;
+
+    function init3DScene() {
+      const canvasEl = document.getElementById('threejs-canvas');
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060913);
+      scene.fog = new THREE.FogExp2(0x060913, 0.035);
+
+      // Camera con inclinazione prospettica da gioco da tavolo
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      setCameraView(false);
+
+      renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      // Luci Scena
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffecd2, 0.85);
+      dirLight.position.set(15, 30, 20);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      // Lampadario centrale Villa (Luce calda d'atmosfera)
+      const pointLight = new THREE.PointLight(0xf59e0b, 1.2, 35);
+      pointLight.position.set(6, 8, 6);
+      scene.add(pointLight);
+
+      build3DMansion();
+      setupPointerControls(canvasEl);
+      window.addEventListener('resize', onWindowResize);
+
+      animate3D();
+    }
+
+    function setCameraView(topDown) {
+      if (topDown) {
+        // Vista tattica planimetrica (ortogonale dall'alto)
+        camera.position.set(5.5, 20, 6.2);
+        camera.lookAt(5.5, 0, 5.5);
+      } else {
+        // Vista 3D immersiva isometrica
+        camera.position.set(5.5, 14, 15.5);
+        camera.lookAt(5.5, 0, 5.8);
+      }
+    }
+
+    function toggle3DView() {
+      isTopDownView = !isTopDownView;
+      setCameraView(isTopDownView);
+    }
+
+    function build3DMansion() {
+      const tileGeo = new THREE.BoxGeometry(0.94, 0.2, 0.94);
+      const wallGeo = new THREE.BoxGeometry(0.96, 0.8, 0.96);
+
+      // Crea le 12x12 celle della villa
+      for (let y = 0; y < 12; y++) {
+        for (let x = 0; x < 12; x++) {
+          const cell = BOARD_GRID[y][x];
+          let color = 0x1e293b;
+          let isWall = false;
+
+          if (cell === 0) {
+            // Corridoio piastrellato scuro
+            color = ((x + y) % 2 === 0) ? 0x1f293d : 0x151f30;
+          } else if (cell === 1) {
+            // Muro centrale inaccessibile
+            color = 0x090d16;
+            isWall = true;
+          } else {
+            // Stanza colorata nobiliare
+            color = ROOM_COLORS[cell] || 0x334155;
+          }
+
+          const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.6,
+            metalness: 0.1
+          });
+
+          const mesh = new THREE.Mesh(isWall ? wallGeo : tileGeo, mat);
+          mesh.position.set(x, isWall ? 0.4 : 0, y);
+          mesh.receiveShadow = true;
+          mesh.castShadow = isWall;
+          mesh.userData = { gridX: x, gridY: y, cellType: cell };
+
+          scene.add(mesh);
+          boardTiles3D.push(mesh);
+
+          // Aggiungi porte 3D in ottone
+          const isDoor = ROOM_DOORS.some(d => d.x === x && d.y === y);
+          if (isDoor) {
+            const doorFrameGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8, roughness: 0.2 });
+            const doorMesh = new THREE.Mesh(doorFrameGeo, doorMat);
+            doorMesh.position.set(x, 0.3, y);
+            scene.add(doorMesh);
+          }
+        }
+      }
+    }
+
+    function update3DBoard() {
+      if (!scene) return;
+
+      // Aggiorna o crea le pedine 3D dei detective
+      gameState.players.forEach(p => {
+        if (!playerPawns3D[p.id]) {
+          // Creazione mesh pedina classica stile Cluedo torneata
+          const pawnGroup = new THREE.Group();
+
+          // Base metallica
+          const baseGeo = new THREE.CylinderGeometry(0.32, 0.38, 0.15, 16);
+          const baseMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.8, roughness: 0.2 });
+          const base = new THREE.Mesh(baseGeo, baseMat);
+          base.position.y = 0.15;
+          pawnGroup.add(base);
+
+          // Corpo tornito colorato del detective
+          const bodyGeo = new THREE.ConeGeometry(0.24, 0.65, 16);
+          const bodyMat = new THREE.MeshStandardMaterial({
+            color: p.hex || 0xffffff,
+            roughness: 0.3,
+            metalness: 0.2
+          });
+          const body = new THREE.Mesh(bodyGeo, bodyMat);
+          body.position.y = 0.52;
+          pawnGroup.add(body);
+
+          // Testa sferica
+          const headGeo = new THREE.SphereGeometry(0.18, 16, 16);
+          const head = new THREE.Mesh(headGeo, bodyMat);
+          head.position.y = 0.92;
+          pawnGroup.add(head);
+
+          // Spotlight personale della pedina
+          const light = new THREE.PointLight(p.hex || 0xffffff, 0.6, 3);
+          light.position.y = 1.3;
+          pawnGroup.add(light);
+
+          pawnGroup.position.set(p.x, 0, p.y);
+          scene.add(pawnGroup);
+          playerPawns3D[p.id] = pawnGroup;
+        } else {
+          // Movimento fluido verso le nuove coordinate
+          const pawn = playerPawns3D[p.id];
+          pawn.position.x = p.x;
+          pawn.position.z = p.y;
+          pawn.position.y = p.eliminated ? -0.2 : 0;
+        }
+      });
+    }
+
+    function setupPointerControls(canvasEl) {
+      function handlePointer(event) {
+        const activePlayer = gameState.players[gameState.turnIndex];
+        if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || activePlayer.eliminated) return;
+
+        const rect = canvasEl.getBoundingClientRect();
+        const clientX = event.clientX || (event.touches && event.touches[0].clientX);
+        const clientY = event.clientY || (event.touches && event.touches[0].clientY);
+
+        if (!clientX || !clientY) return;
+
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(boardTiles3D);
+
+        if (intersects.length > 0) {
+          const hitTile = intersects[0].object;
+          const { gridX, gridY } = hitTile.userData;
+
+          if (isHost) {
+            executeMove(myId, gridX, gridY);
+          } else {
+            hostConn.send({ type: 'ACTION_MOVE', x: gridX, y: gridY });
+          }
+        }
+      }
+
+      canvasEl.addEventListener('pointerdown', handlePointer);
+    }
+
+    function onWindowResize() {
+      if (!renderer || !camera) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+
+      // Piccola oscillazione della luce e rotazione leggera delle pedine attive
+      const time = performance.now() * 0.002;
+      const activePlayer = gameState.players[gameState.turnIndex];
+      if (activePlayer && playerPawns3D[activePlayer.id]) {
+        playerPawns3D[activePlayer.id].position.y = Math.sin(time * 3) * 0.08;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    /* =====================================================================
+       10. TACCUINO INVESTIGATIVO MULTI-COLONNA PERSISTENTE
+       ===================================================================== */
+    function initNotebook() {
+      const savedCols = localStorage.getItem(`cluedo_cols_${currentRoomCode}`);
+      if (savedCols) {
+        try { notebookColumns = JSON.parse(savedCols); } catch(e) {}
+      }
+
+      const savedMatrix = localStorage.getItem(`cluedo_matrix_${currentRoomCode}`);
+      if (savedMatrix) {
+        try { notebookMatrix = JSON.parse(savedMatrix); } catch(e) {}
+      }
+
+      const allItems = [...ALL_CARDS.suspects, ...ALL_CARDS.weapons, ...ALL_CARDS.rooms];
+      allItems.forEach(item => {
+        if (!notebookMatrix[item]) {
+          notebookMatrix[item] = notebookColumns.map((col, idx) => {
+            // Nella prima colonna ("Io"), spunta automaticamente se la possiede
+            if (idx === 0 && myCards.includes(item)) return 'yes';
+            return 'none';
+          });
+        }
+      });
+
+      renderNotebookTable();
+    }
+
+    function addNotebookColumn() {
+      if (notebookColumns.length >= 6) {
+        showCustomAlert('Puoi aggiungere al massimo 6 colonne nel taccuino!');
+        return;
+      }
+      const newName = `Det. ${notebookColumns.length + 1}`;
+      notebookColumns.push(newName);
+
+      Object.keys(notebookMatrix).forEach(item => {
+        notebookMatrix[item].push('none');
+      });
+
+      saveNotebookState();
+      renderNotebookTable();
+    }
+
+    function removeLastNotebookColumn() {
+      if (notebookColumns.length <= 1) return;
+      notebookColumns.pop();
+
+      Object.keys(notebookMatrix).forEach(item => {
+        notebookMatrix[item].pop();
+      });
+
+      saveNotebookState();
+      renderNotebookTable();
+    }
+
+    function saveNotebookState() {
+      localStorage.setItem(`cluedo_cols_${currentRoomCode}`, JSON.stringify(notebookColumns));
+      localStorage.setItem(`cluedo_matrix_${currentRoomCode}`, JSON.stringify(notebookMatrix));
+    }
+
+    function renderNotebookTable() {
+      const headerRow = document.getElementById('notebook-table-header');
+      const tbody = document.getElementById('notebook-table-body');
+      headerRow.innerHTML = '';
+      tbody.innerHTML = '';
+
+      // Intestazione
+      const thItem = document.createElement('th');
+      thItem.className = 'col-item-header';
+      thItem.textContent = 'Elemento';
+      headerRow.appendChild(thItem);
+
+      notebookColumns.forEach((colName, colIdx) => {
+        const th = document.createElement('th');
+        const input = document.createElement('input');
+        input.className = 'col-title-input';
+        input.value = colName;
+        input.onchange = (e) => {
+          notebookColumns[colIdx] = e.target.value.trim() || `Col ${colIdx + 1}`;
+          saveNotebookState();
+        };
+        th.appendChild(input);
+        headerRow.appendChild(th);
+      });
+
+      // Costruzione Sezioni
+      buildNotebookSection(tbody, '👤 SOSPETTATI', ALL_CARDS.suspects);
+      buildNotebookSection(tbody, '🔪 ARMI', ALL_CARDS.weapons);
+      buildNotebookSection(tbody, '🚪 STANZE', ALL_CARDS.rooms);
+    }
+
+    function buildNotebookSection(tbody, sectionTitle, items) {
+      const trHeader = document.createElement('tr');
+      const tdHeader = document.createElement('td');
+      tdHeader.colSpan = notebookColumns.length + 1;
+      tdHeader.style.cssText = 'background: #0f172a; font-weight: 800; font-size: 11px; text-align: left; color: #cbd5e1; padding: 4px 8px;';
+      tdHeader.textContent = sectionTitle;
+      trHeader.appendChild(tdHeader);
+      tbody.appendChild(trHeader);
+
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+
+        const tdName = document.createElement('td');
+        tdName.className = 'item-name-cell';
+        tdName.textContent = item;
+        tr.appendChild(tdName);
+
+        notebookColumns.forEach((_, colIdx) => {
+          const td = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.className = 'mark-btn';
+          const currentVal = (notebookMatrix[item] && notebookMatrix[item][colIdx]) || 'none';
+          updateMarkButtonDisplay(btn, currentVal);
+
+          btn.onclick = () => {
+            cycleNotebookMark(item, colIdx, btn);
+          };
+
+          td.appendChild(btn);
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function cycleNotebookMark(item, colIdx, btn) {
+      const sequence = ['none', 'no', 'yes', 'maybe', 'star'];
+      const cur = (notebookMatrix[item] && notebookMatrix[item][colIdx]) || 'none';
+      const nextIdx = (sequence.indexOf(cur) + 1) % sequence.length;
+      const nextVal = sequence[nextIdx];
+
+      if (!notebookMatrix[item]) notebookMatrix[item] = [];
+      notebookMatrix[item][colIdx] = nextVal;
+      updateMarkButtonDisplay(btn, nextVal);
+      saveNotebookState();
+    }
+
+    function updateMarkButtonDisplay(btn, val) {
+      btn.className = 'mark-btn';
+      if (val === 'none') {
+        btn.textContent = '·';
+        btn.classList.add('mark-none');
+      } else if (val === 'no') {
+        btn.textContent = '✕';
+        btn.classList.add('mark-no');
+      } else if (val === 'yes') {
+        btn.textContent = '✓';
+        btn.classList.add('mark-yes');
+      } else if (val === 'maybe') {
+        btn.textContent = '?';
+        btn.classList.add('mark-maybe');
+      } else if (val === 'star') {
+        btn.textContent = '★';
+        btn.classList.add('mark-star');
+      }
+    }
+
+    /* =====================================================================
+       11. AZIONI CLIENT & GESTIONE INTERFACCIA
+       ===================================================================== */
     function rollDice() {
-      AudioSys.dice();
+      SoundEngine.dice();
       if (isHost) {
         const active = gameState.players[gameState.turnIndex];
         if (active && active.id === myId && gameState.stepsLeft === 0 && !gameState.activeSuggestion && !active.eliminated) {
@@ -1115,11 +1883,11 @@
       const me = gameState.players.find(p => p.id === myId);
       const room = getPlayerCurrentRoom(me);
       if (!room) {
-        showCustomAlert('Devi essere all\'interno di una stanza per formulare un\'ipotesi!');
+        showCustomAlert('Devi essere entrato in una stanza per formulare un\'ipotesi!');
         return;
       }
 
-      document.getElementById('suggest-current-room-label').textContent = room;
+      document.getElementById('suggest-room-name').textContent = room;
       document.getElementById('suggestRoomDisplay').value = room;
 
       const sSelect = document.getElementById('suggestSuspect');
@@ -1179,7 +1947,7 @@
     function openDisproveModal(sugg) {
       const banner = document.getElementById('disprove-banner');
       banner.innerHTML = `
-        <strong>Ipotesi da verificare:</strong><br>
+        <strong>Ipotesi da confutare:</strong><br>
         👤 Sospettato: <strong>${sugg.suspect}</strong><br>
         🔪 Arma: <strong>${sugg.weapon}</strong><br>
         🚪 Stanza: <strong>${sugg.room}</strong>
@@ -1193,8 +1961,8 @@
       if (matchedCards.length > 0) {
         matchedCards.forEach(card => {
           const btn = document.createElement('button');
-          btn.textContent = `Mostra segretamente: ${card}`;
-          btn.style.cssText = 'background: #10b981; color: #022c22; font-weight: 700; padding: 12px; font-size: 14px;';
+          btn.textContent = `Mostra in segreto: ${card}`;
+          btn.style.cssText = 'background: #10b981; color: #022c22; font-weight: 800; padding: 12px; font-size: 13px;';
           btn.onclick = () => {
             closeModal('disprove-modal');
             sendDisproveChoice(card, true);
@@ -1203,8 +1971,8 @@
         });
       } else {
         const noMatchMsg = document.createElement('div');
-        noMatchMsg.textContent = 'Non possiedi nessuna delle tre carte richieste.';
-        noMatchMsg.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic; padding: 6px 0;';
+        noMatchMsg.textContent = 'Non possiedi alcuna carta corrispondente a questa ipotesi.';
+        noMatchMsg.style.cssText = 'color: #94a3b8; font-size: 12px; font-style: italic; padding: 6px 0;';
         listDiv.appendChild(noMatchMsg);
       }
 
@@ -1224,91 +1992,45 @@
       }
     }
 
-    // Touch su Canvas
-    canvas.addEventListener('pointerdown', (e) => {
-      const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || activePlayer.eliminated) return;
+    function renderMyCards() {
+      const container = document.getElementById('my-cards-container');
+      const countEl = document.getElementById('my-cards-count');
+      container.innerHTML = '';
+      countEl.textContent = myCards.length;
 
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
+      myCards.forEach(card => {
+        let type = 'Indizio';
+        if (ALL_CARDS.suspects.includes(card)) type = 'Sospettato';
+        else if (ALL_CARDS.weapons.includes(card)) type = 'Arma';
+        else if (ALL_CARDS.rooms.includes(card)) type = 'Stanza';
 
-      const x = Math.floor(((e.clientX - rect.left) * scaleX) / tileSize);
-      const y = Math.floor(((e.clientY - rect.top) * scaleY) / tileSize);
+        const tile = document.createElement('div');
+        tile.className = 'card-tile';
 
-      if (isHost) {
-        executeMove(myId, x, y);
-      } else {
-        hostConn.send({ type: 'ACTION_MOVE', x, y });
-      }
-    });
+        const label = document.createElement('div');
+        label.className = 'card-tile-label';
+        label.textContent = card;
 
-    // --- INTERFACCIA E RENDERING TABELLONE ---
-    function resizeCanvas() {
-      const containerWidth = Math.min(window.innerWidth - 24, 400);
-      tileSize = Math.floor(containerWidth / GRID_SIZE);
-      canvas.width = tileSize * GRID_SIZE;
-      canvas.height = tileSize * GRID_SIZE;
-      draw();
-    }
-    window.addEventListener('resize', resizeCanvas);
+        const badge = document.createElement('div');
+        badge.className = 'card-tile-type';
+        badge.textContent = type;
 
-    function showWaitingScreen() {
-      document.getElementById('lobby-screen').style.display = 'none';
-      document.getElementById('waiting-screen').style.display = 'flex';
-      document.getElementById('game-container').style.display = 'none';
-    }
-
-    function showGameView() {
-      document.getElementById('lobby-screen').style.display = 'none';
-      document.getElementById('waiting-screen').style.display = 'none';
-      document.getElementById('game-container').style.display = 'flex';
-      resizeCanvas();
-    }
-
-    function updateWaitingRoomUI() {
-      const listUl = document.getElementById('player-list-ul');
-      const countSpan = document.getElementById('player-count');
-      listUl.innerHTML = '';
-
-      countSpan.textContent = `${gameState.players.length}/6`;
-
-      gameState.players.forEach(p => {
-        const li = document.createElement('li');
-        li.className = 'player-item';
-
-        const dot = document.createElement('span');
-        dot.className = 'color-dot';
-        dot.style.background = p.color;
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = p.name + (p.id === myId ? ' (Tu)' : '');
-
-        li.appendChild(dot);
-        li.appendChild(nameSpan);
-
-        if (p.isHost) {
-          const hostBadge = document.createElement('span');
-          hostBadge.textContent = 'HOST';
-          hostBadge.style.cssText = 'font-size: 10px; background: #f59e0b; color: #000; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: auto;';
-          li.appendChild(hostBadge);
-        }
-
-        listUl.appendChild(li);
+        tile.appendChild(label);
+        tile.appendChild(badge);
+        container.appendChild(tile);
       });
     }
 
-    function updateUI() {
-      draw();
+    function updateHUD() {
       const activePlayer = gameState.players[gameState.turnIndex];
       if (!activePlayer) return;
 
       const isMyTurn = (activePlayer.id === myId);
-      const statusDiv = document.getElementById('status');
+      const statusDiv = document.getElementById('status-display');
       const diceBtn = document.getElementById('diceBtn');
       const suggestBtn = document.getElementById('suggestBtn');
-      const passageBtn = document.getElementById('secretPassageBtn');
-      const endTurnBtn = document.getElementById('endTurnBtn');
+      const passageBtn = document.getElementById('passageBtn');
+      const endTurnBtn = document.getElementById('passTurnBtn');
       const accuseBtn = document.getElementById('accuseBtn');
 
       if (gameState.gameOver) {
@@ -1321,7 +2043,7 @@
       const myRoom = getPlayerCurrentRoom(me);
 
       if (gameState.activeSuggestion) {
-        statusDiv.innerHTML = `🔍 Chiamata di <strong>${gameState.activeSuggestion.callerName}</strong> in verifica...`;
+        statusDiv.innerHTML = `🔍 Ipotesi di <strong>${gameState.activeSuggestion.callerName}</strong> in verifica...`;
         [diceBtn, suggestBtn, passageBtn, endTurnBtn, accuseBtn].forEach(b => b.disabled = true);
         return;
       }
@@ -1333,175 +2055,69 @@
         passageBtn.disabled = !myRoom || !SECRET_PASSAGES[myRoom];
 
         if (gameState.stepsLeft > 0) {
-          statusDiv.innerHTML = `🎯 <strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca una casella adiacente)`;
+          statusDiv.innerHTML = `🎯 <strong>Tocca a te (${me.charName})!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca una casella adiacente sul tabellone)`;
           diceBtn.disabled = true;
         } else {
           statusDiv.innerHTML = myRoom 
             ? `🏰 Ti trovi in <strong>${myRoom}</strong>. Puoi formulare un'ipotesi o passare.`
-            : `🎲 <strong>Tocca a te!</strong> Tira il dado per muoverti.`;
+            : `🎲 <strong>Tocca a te (${me.charName})!</strong> Lancia il dado per muoverti.`;
           diceBtn.disabled = false;
         }
       } else {
-        const turnLabel = activePlayer.eliminated ? `${activePlayer.name} (Eliminato)` : activePlayer.name;
-        statusDiv.innerHTML = `⏳ Turno di: <strong>${turnLabel}</strong>`;
+        const turnLabel = activePlayer.eliminated ? `${activePlayer.name} (Eliminato)` : `${activePlayer.name} (${activePlayer.charName})`;
+        statusDiv.innerHTML = `⏳ Turno investigativo di: <strong>${turnLabel}</strong>`;
         [diceBtn, suggestBtn, passageBtn, endTurnBtn, accuseBtn].forEach(b => b.disabled = true);
       }
     }
 
-    function draw() {
-      if (!tileSize) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function showWaitingScreen() {
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('waiting-screen').style.display = 'flex';
+      document.getElementById('game-container').style.display = 'none';
+    }
 
-      // 1. Disegna le celle della villa
-      for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
-          const cell = BOARD_GRID[y][x];
+    function showGameView() {
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('waiting-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'block';
+      if (!scene) init3DScene();
+    }
 
-          if (cell === 0) {
-            ctx.fillStyle = ((x + y) % 2 === 0) ? '#1e293b' : '#0f172a';
-          } else if (cell === 1) {
-            ctx.fillStyle = '#020617';
-          } else {
-            ctx.fillStyle = ROOM_COLORS[cell] || '#334155';
-          }
+    function updateWaitingRoomUI() {
+      const container = document.getElementById('waiting-players-list');
+      const countSpan = document.getElementById('player-count');
+      container.innerHTML = '';
+      countSpan.textContent = `${gameState.players.length}/6`;
 
-          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-          ctx.strokeStyle = '#334155';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
-        }
-      }
-
-      // 2. Disegna le Porte delle Stanze
-      ROOM_DOORS.forEach(d => {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(d.x * tileSize + 2, d.y * tileSize + 2, tileSize - 4, tileSize - 4);
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('🚪', d.x * tileSize + tileSize / 2, d.y * tileSize + tileSize / 1.4);
-      });
-
-      // 3. Nomi delle stanze sovraimpresse
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('CUCINA', 1.5 * tileSize, 1.6 * tileSize);
-      ctx.fillText('BALLO', 5.5 * tileSize, 1.6 * tileSize);
-      ctx.fillText('VERANDA', 10.5 * tileSize, 1.6 * tileSize);
-      ctx.fillText('PRANZO', 1.5 * tileSize, 5.6 * tileSize);
-      ctx.fillText('BILIARDO', 10.5 * tileSize, 5.6 * tileSize);
-      ctx.fillText('SALOTTO', 1.5 * tileSize, 9.6 * tileSize);
-      ctx.fillText('INGRESSO', 5.5 * tileSize, 9.6 * tileSize);
-      ctx.fillText('BIBLIO', 10.5 * tileSize, 9.6 * tileSize);
-      ctx.fillText('STUDIO', 2.5 * tileSize, 11.6 * tileSize);
-
-      // 4. Pedine dei giocatori
       gameState.players.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x * tileSize + tileSize / 2, p.y * tileSize + tileSize / 2, tileSize / 2.6, 0, Math.PI * 2);
-        ctx.fillStyle = p.eliminated ? '#64748b' : p.color;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = p.eliminated ? '#dc2626' : '#ffffff';
-        ctx.stroke();
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:8px; background:#0b1120; padding:8px 10px; border-radius:8px; font-size:13px; border:1px solid #1e293b;';
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 8px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.id === myId ? 'TU' : p.name.substring(0, 3).toUpperCase(), p.x * tileSize + tileSize / 2, p.y * tileSize + tileSize / 1.5);
+        const dot = document.createElement('span');
+        dot.style.cssText = `width:12px; height:12px; border-radius:50%; background:${p.color}; border:2px solid #fff; flex-shrink:0;`;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = `${p.name} (${p.charName})` + (p.id === myId ? ' - TU' : '');
+
+        row.appendChild(dot);
+        row.appendChild(nameSpan);
+
+        if (p.isHost) {
+          const badge = document.createElement('span');
+          badge.textContent = 'HOST';
+          badge.style.cssText = 'font-size:10px; background:var(--gold); color:#000; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:auto;';
+          row.appendChild(badge);
+        }
+
+        container.appendChild(row);
       });
     }
 
-    // --- TACCUINO E MEMORIA LOCALE ---
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     function showCustomAlert(msg) {
       document.getElementById('custom-alert-msg').textContent = msg;
       openModal('custom-alert-modal');
-    }
-
-    function renderMyCards() {
-      const container = document.getElementById('my-cards-container');
-      const countEl = document.getElementById('my-cards-count');
-      container.innerHTML = '';
-      countEl.textContent = myCards.length;
-
-      myCards.forEach(card => {
-        const div = document.createElement('div');
-        div.className = 'card-pill';
-        div.innerHTML = `<span>🔍</span> <span>${card}</span>`;
-        container.appendChild(div);
-      });
-    }
-
-    function initNotebook() {
-      const saved = localStorage.getItem(`cluedo_sheet_${currentRoomCode}`);
-      if (saved) {
-        try { notebookState = JSON.parse(saved); } catch(e) {}
-      }
-
-      ['suspects', 'weapons', 'rooms'].forEach(cat => {
-        ALL_CARDS[cat].forEach(item => {
-          if (!notebookState[item]) {
-            notebookState[item] = myCards.includes(item) ? 'yes' : 'none';
-          }
-        });
-      });
-      renderNotebookSection('suspects-notebook', ALL_CARDS.suspects);
-      renderNotebookSection('weapons-notebook', ALL_CARDS.weapons);
-      renderNotebookSection('rooms-notebook', ALL_CARDS.rooms);
-    }
-
-    function renderNotebookSection(containerId, list) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = '';
-
-      list.forEach(item => {
-        const row = document.createElement('div');
-        row.className = 'sheet-row';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = item;
-        nameSpan.style.fontSize = '13px';
-
-        const statusBtn = document.createElement('button');
-        statusBtn.className = 'sheet-status-btn';
-        updateStatusBtn(statusBtn, notebookState[item]);
-
-        statusBtn.onclick = () => {
-          cycleStatus(item, statusBtn);
-        };
-
-        row.appendChild(nameSpan);
-        row.appendChild(statusBtn);
-        container.appendChild(row);
-      });
-    }
-
-    function cycleStatus(item, btn) {
-      const order = ['none', 'no', 'yes', 'maybe'];
-      const nextIdx = (order.indexOf(notebookState[item]) + 1) % order.length;
-      notebookState[item] = order[nextIdx];
-      updateStatusBtn(btn, notebookState[item]);
-      localStorage.setItem(`cluedo_sheet_${currentRoomCode}`, JSON.stringify(notebookState));
-    }
-
-    function updateStatusBtn(btn, status) {
-      btn.className = 'sheet-status-btn';
-      if (status === 'none') {
-        btn.textContent = '·';
-        btn.classList.add('status-none');
-      } else if (status === 'no') {
-        btn.textContent = '✕';
-        btn.classList.add('status-no');
-      } else if (status === 'yes') {
-        btn.textContent = '✓';
-        btn.classList.add('status-yes');
-      } else if (status === 'maybe') {
-        btn.textContent = '?';
-        btn.classList.add('status-maybe');
-      }
     }
   </script>
 </body>
