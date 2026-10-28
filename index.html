@@ -236,6 +236,11 @@
       border-left: 4px solid var(--gold);
     }
 
+    .hud-controls-group {
+      display: flex;
+      gap: 6px;
+    }
+
     .view-toggle-btn {
       width: 42px;
       height: 42px;
@@ -246,6 +251,18 @@
       color: var(--gold);
       font-size: 18px;
       flex-shrink: 0;
+    }
+
+    /* Barra Notifica Carte Pubbliche (Resto) */
+    .clues-banner {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #6ee7b7;
+      text-align: center;
+      display: none;
     }
 
     /* Barra Controlli Inferiore Docked */
@@ -527,7 +544,7 @@
     <div class="bottom-dock">
       <!-- Azioni Primarie -->
       <div class="action-row">
-        <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1.1; font-size: 13px; padding: 11px;">🎲 DADO</button>
+        <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1.1; font-size: 13px; padding: 11px;">🎲 2 DADI</button>
         <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1.3; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; font-size: 13px; padding: 11px;">🔍 IPOTESI</button>
         <button id="passageBtn" onclick="useSecretPassage()" disabled style="flex: 1; background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; font-size: 11px; padding: 11px;">🚪 PASSAGGIO</button>
         <button id="passTurnBtn" onclick="passTurn()" disabled style="flex: 0.9; background: #334155; color: #fff; font-size: 12px; padding: 11px;">PASSA</button>
@@ -545,6 +562,9 @@
           ⚖️ ACCUSA
         </button>
       </div>
+
+      <!-- Notifica Carte Scoperte Iniziali -->
+      <div id="public-clues-box" class="clues-banner"></div>
 
       <!-- Feed Registro Indagini -->
       <div id="game-log" class="glass-panel log-bar"></div>
@@ -626,6 +646,19 @@
       <button id="disprove-none-btn" onclick="passDisprove()" style="background: #334155; color: #fff; margin-top: 8px; font-size: 12px; padding: 10px;">
         NON HO NESSUNA DI QUESTE CARTE
       </button>
+    </div>
+  </div>
+
+  <!-- MODALE SMART AUTO-ANNOTAZIONE TACCUINO -->
+  <div id="smart-note-modal" class="modal-overlay">
+    <div class="modal-card glass-panel" style="text-align: center; max-width: 360px;">
+      <h3 style="color: var(--gold); font-size: 16px;">📝 Auto-Compila Taccuino</h3>
+      <p id="smart-note-text" style="font-size: 13px; color: var(--text-muted); margin: 6px 0;"></p>
+      <div style="display:flex; gap:8px; margin-top: 8px;">
+        <button id="smart-note-btn-yes" style="background: #10b981; color:#042f2e; flex:1;">SEGNA (✓)</button>
+        <button id="smart-note-btn-no" style="background: #dc2626; color:#fff; flex:1;">SEGNA (✕)</button>
+        <button onclick="closeModal('smart-note-modal')" style="background: #334155; color:#cbd5e1; flex:0.7;">IGNORA</button>
+      </div>
     </div>
   </div>
 
@@ -836,6 +869,12 @@
       win() { [523, 659, 783, 1046, 1318].forEach((f, i) => setTimeout(() => this.tone(f, 'square', 0.35, 0.2), i * 140)); }
     };
 
+    function triggerHaptic(pattern = [40]) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch(e) {}
+      }
+    }
+
     /* =====================================================================
        3. VARIABILI DI STATO E DI RETE PEERJS
        ===================================================================== */
@@ -853,13 +892,25 @@
       players: [],
       turnIndex: 0,
       stepsLeft: 0,
+      diceVal1: 0,
+      diceVal2: 0,
       activeSuggestion: null,
       gameOver: false,
-      winnerName: null
+      winnerName: null,
+      publicClues: [],
+      weaponPositions: {
+        'Candeliere': 'Salotto',
+        'Pugnale': 'Cucina',
+        'Tubo di Piombo': 'Veranda',
+        'Rivoltella': 'Studio',
+        'Corda': 'Sala da Pranzo',
+        'Chiave Inglese': 'Sala da Biliardo'
+      }
     };
 
     let myCards = [];
     let secretCaseFile = null;
+    let reachableTiles = []; // Cache calcolo BFS per highlighting e tocco singolo
 
     // Struttura Taccuino Multi-Colonna Avanzato
     let notebookColumns = ['Io', 'Sospetti'];
@@ -1030,6 +1081,8 @@
               showGameView();
               update3DBoard();
               updateHUD();
+              computeReachableTiles();
+              renderPublicClues();
             } else {
               updateWaitingRoomUI();
             }
@@ -1041,6 +1094,7 @@
           }
           if (data.type === 'PROMPT_DISPROVE') {
             SoundEngine.alert();
+            triggerHaptic([60, 80, 60]);
             openDisproveModal(data.suggestion);
           }
           if (data.type === 'SUGGESTION_RESULT') {
@@ -1051,6 +1105,7 @@
           }
           if (data.type === 'GAME_OVER') {
             SoundEngine.win();
+            triggerHaptic([100, 100, 200, 200]);
             showCustomAlert(data.message);
           }
         });
@@ -1098,14 +1153,17 @@
       if (data.type === 'ACTION_ROLL') {
         const active = gameState.players[gameState.turnIndex];
         if (active && active.id === conn.peer && gameState.stepsLeft === 0 && !gameState.activeSuggestion && !active.eliminated) {
-          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
-          broadcastLog(`${active.name} ha tirato il dado: ${gameState.stepsLeft}`);
+          gameState.diceVal1 = Math.floor(Math.random() * 6) + 1;
+          gameState.diceVal2 = Math.floor(Math.random() * 6) + 1;
+          gameState.stepsLeft = gameState.diceVal1 + gameState.diceVal2;
+          triggerDiceRollAnimation(gameState.diceVal1, gameState.diceVal2);
+          broadcastLog(`${active.name} ha lanciato i dadi: [${gameState.diceVal1} + ${gameState.diceVal2}] = ${gameState.stepsLeft} passi!`);
           broadcastState();
         }
       }
 
-      if (data.type === 'ACTION_MOVE') {
-        executeMove(conn.peer, data.x, data.y);
+      if (data.type === 'ACTION_MOVE_PATH') {
+        executePathMove(conn.peer, data.targetX, data.targetY);
       }
 
       if (data.type === 'ACTION_PASSAGE') {
@@ -1146,6 +1204,7 @@
       init3DScene();
       update3DBoard();
       updateHUD();
+      renderPublicClues();
       broadcastLog('L\'indagine è aperta! Un delitto è stato consumato nella Villa.');
     }
 
@@ -1169,10 +1228,21 @@
       const hands = {};
       gameState.players.forEach(p => hands[p.id] = []);
 
-      let pIdx = 0;
+      // REGOLA UFFICIALE: Calcolo resto delle carte per giocatori < 6
+      const numPlayers = gameState.players.length;
+      const cardsPerPlayer = Math.floor(deck.length / numPlayers);
+      const remainderCount = deck.length % numPlayers;
+
+      for (let i = 0; i < cardsPerPlayer; i++) {
+        gameState.players.forEach(p => {
+          hands[p.id].push(deck.pop());
+        });
+      }
+
+      // Le carte residue vengono rivelate pubblicamente a tutti sul tavolo a inizio partita
+      gameState.publicClues = [];
       while (deck.length > 0) {
-        hands[gameState.players[pIdx].id].push(deck.pop());
-        pIdx = (pIdx + 1) % gameState.players.length;
+        gameState.publicClues.push(deck.pop());
       }
 
       myCards = hands[myId] || [];
@@ -1186,51 +1256,140 @@
       });
     }
 
+    function renderPublicClues() {
+      const box = document.getElementById('public-clues-box');
+      if (gameState.publicClues && gameState.publicClues.length > 0) {
+        box.style.display = 'block';
+        box.innerHTML = `📜 <strong>Indizi Noti Iniziali della Villa (Carte Scoperte):</strong> ${gameState.publicClues.join(', ')}`;
+      } else {
+        box.style.display = 'none';
+      }
+    }
+
     function getPlayerCurrentRoom(player) {
       if (!player) return null;
       const cell = BOARD_GRID[player.y] ? BOARD_GRID[player.y][player.x] : 0;
       return ROOM_NAMES[cell] || null;
     }
 
-    function executeMove(playerId, targetX, targetY) {
+    /* =====================================================================
+       PATHFINDING BFS: CALCOLO DESTINAZIONI RAGGIUNGIBILI A TOCCO SINGOLO
+       ===================================================================== */
+    function getTileNeighbors(x, y) {
+      const results = [];
+      const deltas = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      const currentCell = BOARD_GRID[y] ? BOARD_GRID[y][x] : 1;
+
+      deltas.forEach(([dx, dy]) => {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && nx < 12 && ny >= 0 && ny < 12) {
+          const nextCell = BOARD_GRID[ny][nx];
+          if (nextCell === 1) return; // Muro interno inaccessibile
+
+          // Ingresso Stanza: ammesso solo se (nx, ny) è una porta designata della stanza
+          if (currentCell === 0 && nextCell > 1) {
+            const roomName = ROOM_NAMES[nextCell];
+            const isDoor = ROOM_DOORS.some(d => d.room === roomName && d.x === nx && d.y === ny);
+            if (!isDoor) return;
+          }
+
+          // Uscita Stanza: ammesso uscire solo passando per le caselle porta
+          if (currentCell > 1 && nextCell === 0) {
+            const roomName = ROOM_NAMES[currentCell];
+            const isDoor = ROOM_DOORS.some(d => d.room === roomName && d.x === x && d.y === y);
+            if (!isDoor) return;
+          }
+
+          // Non transitare su caselle corridoio già occupate da altre pedine
+          const occupied = nextCell === 0 && gameState.players.some(p => p.x === nx && p.y === ny && !p.eliminated);
+          if (occupied) return;
+
+          results.push({ x: nx, y: ny, cell: nextCell });
+        }
+      });
+      return results;
+    }
+
+    function computeReachableTiles() {
+      reachableTiles = [];
+      const active = gameState.players[gameState.turnIndex];
+      if (!active || active.id !== myId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || active.eliminated) {
+        highlightReachableTiles([]);
+        return;
+      }
+
+      // Ricerca in ampiezza (BFS) per calcolare la distanza minima esatta
+      const queue = [{ x: active.x, y: active.y, dist: 0 }];
+      const visited = new Map();
+      visited.set(`${active.x},${active.y}`, 0);
+
+      const validDestinations = [];
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+
+        if (curr.dist < gameState.stepsLeft) {
+          const neighbors = getTileNeighbors(curr.x, curr.y);
+          for (const n of neighbors) {
+            const key = `${n.x},${n.y}`;
+            const newDist = curr.dist + 1;
+
+            if (!visited.has(key) || visited.get(key) > newDist) {
+              visited.set(key, newDist);
+              queue.push({ x: n.x, y: n.y, dist: newDist });
+
+              // Se è una stanza, entrare consuma tutto il movimento e si ferma
+              const isRoom = n.cell > 1;
+              if (isRoom) {
+                validDestinations.push({ x: n.x, y: n.y, isRoom: true });
+              } else if (newDist === gameState.stepsLeft) {
+                validDestinations.push({ x: n.x, y: n.y, isRoom: false });
+              }
+            }
+          }
+        }
+      }
+
+      reachableTiles = validDestinations;
+      highlightReachableTiles(reachableTiles);
+    }
+
+    function highlightReachableTiles(tiles) {
+      if (!boardTiles3D) return;
+      boardTiles3D.forEach(tile => {
+        const gx = tile.userData.gridX;
+        const gy = tile.userData.gridY;
+        const isReachable = tiles.some(t => t.x === gx && t.y === gy);
+
+        if (isReachable) {
+          tile.material.emissive = new THREE.Color(0x10b981);
+          tile.material.emissiveIntensity = 0.55;
+        } else {
+          tile.material.emissive = new THREE.Color(0x000000);
+          tile.material.emissiveIntensity = 0;
+        }
+      });
+    }
+
+    function executePathMove(playerId, targetX, targetY) {
       const activePlayer = gameState.players[gameState.turnIndex];
       if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || activePlayer.eliminated) return;
 
-      if (targetX < 0 || targetX >= 12 || targetY < 0 || targetY >= 12) return;
+      activePlayer.x = targetX;
+      activePlayer.y = targetY;
+      gameState.stepsLeft = 0;
+      SoundEngine.step();
+      triggerHaptic([35]);
 
-      const targetCell = BOARD_GRID[targetY][targetX];
-      if (targetCell === 1) return; // Muro interno inaccessibile
+      const inRoom = getPlayerCurrentRoom(activePlayer);
+      if (inRoom) {
+        SoundEngine.door();
+        broadcastLog(`${activePlayer.name} è entrato in ${inRoom}.`);
+      }
 
-      // Regola: non puoi calpestare una casella corridoio già occupata da un altro detective
-      const isOccupiedCorridor = targetCell === 0 && gameState.players.some(p => p.x === targetX && p.y === targetY && p.id !== playerId);
-      if (isOccupiedCorridor) return;
-
-      const currentCell = BOARD_GRID[activePlayer.y][activePlayer.x];
-      const dx = Math.abs(activePlayer.x - targetX);
-      const dy = Math.abs(activePlayer.y - targetY);
-
-      if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-        // Regola Porte: l'ingresso/uscita dalle stanze deve avvenire tramite le porte ufficiali
-        const enteringRoom = currentCell === 0 && targetCell > 1;
-        if (enteringRoom) {
-          const roomName = ROOM_NAMES[targetCell];
-          const isDoor = ROOM_DOORS.some(d => d.room === roomName && d.x === targetX && d.y === targetY);
-          if (!isDoor) return;
-        }
-
-        activePlayer.x = targetX;
-        activePlayer.y = targetY;
-        gameState.stepsLeft--;
-        SoundEngine.step();
-
-        const inRoom = getPlayerCurrentRoom(activePlayer);
-        if (inRoom) {
-          SoundEngine.door();
-          broadcastLog(`${activePlayer.name} è entrato in ${inRoom}.`);
-          gameState.stepsLeft = 0; // Entrare in una stanza consuma il movimento
-        }
-
-        if (isHost) broadcastState();
+      if (isHost) {
+        broadcastState();
       }
     }
 
@@ -1246,6 +1405,7 @@
         activePlayer.y = passage.spawn.y;
         gameState.stepsLeft = 0;
         SoundEngine.secret();
+        triggerHaptic([60, 40, 60]);
         broadcastLog(`${activePlayer.name} ha usato il passaggio segreto: ${currentRoom} ➔ ${passage.targetRoom}!`);
         if (isHost) broadcastState();
       }
@@ -1259,11 +1419,16 @@
         count++;
       } while (gameState.players[gameState.turnIndex].eliminated && count < gameState.players.length);
 
+      const nextPlayer = gameState.players[gameState.turnIndex];
+      if (nextPlayer && nextPlayer.id === myId) {
+        triggerHaptic([80, 50, 80]);
+      }
+
       broadcastState();
     }
 
     /* =====================================================================
-       7. IPOTESI UFFICIALE & CONVOCAZIONE SOSPETTATO
+       7. IPOTESI UFFICIALE & CONVOCAZIONE SOSPETTATO ED ARMA 3D
        ===================================================================== */
     function initiateSuggestion(callerId, suggestion) {
       const callerIndex = gameState.players.findIndex(p => p.id === callerId);
@@ -1277,13 +1442,19 @@
         startIndex: callerIndex
       };
 
-      // REGOLA UFFICIALE: Sposta la pedina del sospettato interrogato nella stanza dell'ipotesi
+      // REGOLA UFFICIALE 1: Convocazione della pedina del sospettato nella stanza
       const summonedChar = gameState.players.find(p => p.charName === suggestion.suspect);
       if (summonedChar) {
         const callerPlayer = gameState.players[callerIndex];
         summonedChar.x = callerPlayer.x;
         summonedChar.y = callerPlayer.y;
         broadcastLog(`La pedina di ${summonedChar.charName} è stata convocata in ${suggestion.room}!`);
+      }
+
+      // REGOLA UFFICIALE 2: Convocazione dell'Arma 3D nella stanza
+      if (gameState.weaponPositions && suggestion.weapon) {
+        gameState.weaponPositions[suggestion.weapon] = suggestion.room;
+        broadcastLog(`La ${suggestion.weapon} è stata portata in ${suggestion.room}.`);
       }
 
       broadcastLog(`${gameState.players[callerIndex].name} ipotizza: ${suggestion.suspect} con ${suggestion.weapon} in ${suggestion.room}`);
@@ -1387,6 +1558,7 @@
         broadcast({ type: 'GAME_OVER', message: winMsg });
         showCustomAlert(winMsg);
         SoundEngine.win();
+        triggerHaptic([150, 100, 150, 100, 300]);
       } else {
         player.eliminated = true;
         broadcastLog(`❌ ${player.name} ha formulato un'accusa errata ed è stato ELIMINATO dalle indagini attive!`);
@@ -1429,6 +1601,8 @@
       if (gameState.started) {
         update3DBoard();
         updateHUD();
+        computeReachableTiles();
+        renderPublicClues();
       }
     }
 
@@ -1436,6 +1610,8 @@
       if (data.callerId === myId) {
         if (data.disproved) {
           SoundEngine.alert();
+          triggerHaptic([70, 70]);
+          promptSmartNote(data.card, data.responderName);
           showCustomAlert(`🕵️ ${data.responderName} ti ha mostrato in segreto la carta:\n👉 [ ${data.card} ]`);
         } else {
           showCustomAlert(`🔍 Nessun detective ha potuto smentire la tua ipotesi!\nNessuno possiede quelle 3 carte.`);
@@ -1449,6 +1625,28 @@
       }
     }
 
+    function promptSmartNote(cardName, responderName) {
+      document.getElementById('smart-note-text').innerHTML = `Vuoi annotare la carta rivelata <strong>[${cardName}]</strong> mostrata da <strong>${responderName}</strong>?`;
+      document.getElementById('smart-note-btn-yes').onclick = () => {
+        applySmartMark(cardName, 'yes');
+        closeModal('smart-note-modal');
+      };
+      document.getElementById('smart-note-btn-no').onclick = () => {
+        applySmartMark(cardName, 'no');
+        closeModal('smart-note-modal');
+      };
+      openModal('smart-note-modal');
+    }
+
+    function applySmartMark(cardName, markType) {
+      if (notebookMatrix[cardName]) {
+        // Segna nella colonna 0 ("Io") o crea evidenza
+        notebookMatrix[cardName][0] = markType;
+        saveNotebookState();
+        renderNotebookTable();
+      }
+    }
+
     function addGameLog(text) {
       const logDiv = document.getElementById('game-log');
       const item = document.createElement('div');
@@ -1458,12 +1656,21 @@
     }
 
     /* =====================================================================
-       9. MOTORE GRAFICO 3D CON THREE.JS (VILLA TUDOR, LUCI & RAYCASTING)
+       9. MOTORE GRAFICO 3D CON THREE.JS (VILLA TUDOR, TOUCH ORBIT & ARREDI)
        ===================================================================== */
     let scene, camera, renderer, raycaster, mouse;
     let boardTiles3D = [];
     let playerPawns3D = {};
+    let weaponMeshes3D = {};
+    let dice3D_1, dice3D_2;
     let isTopDownView = false;
+
+    // Variabili Touch Orbit & Pinch-to-Zoom
+    let isTouching = false;
+    let touchStartDist = 0;
+    let previousTouchPos = { x: 0, y: 0 };
+    let cameraOrbit = { radius: 19, theta: Math.PI / 4, phi: Math.PI / 3.4 };
+    let cameraTarget = new THREE.Vector3(5.5, 0, 5.5);
 
     function init3DScene() {
       const canvasEl = document.getElementById('threejs-canvas');
@@ -1472,11 +1679,10 @@
 
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x060913);
-      scene.fog = new THREE.FogExp2(0x060913, 0.035);
+      scene.fog = new THREE.FogExp2(0x060913, 0.032);
 
-      // Camera con inclinazione prospettica da gioco da tavolo
       camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-      setCameraView(false);
+      updateCameraOrbitPosition();
 
       renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
       renderer.setSize(width, height);
@@ -1488,7 +1694,7 @@
       mouse = new THREE.Vector2();
 
       // Luci Scena
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
       scene.add(ambientLight);
 
       const dirLight = new THREE.DirectionalLight(0xffecd2, 0.85);
@@ -1498,40 +1704,41 @@
       dirLight.shadow.mapSize.height = 1024;
       scene.add(dirLight);
 
-      // Lampadario centrale Villa (Luce calda d'atmosfera)
-      const pointLight = new THREE.PointLight(0xf59e0b, 1.2, 35);
+      const pointLight = new THREE.PointLight(0xf59e0b, 1.3, 35);
       pointLight.position.set(6, 8, 6);
       scene.add(pointLight);
 
       build3DMansion();
-      setupPointerControls(canvasEl);
+      buildRoomDecorations();
+      build3DWeapons();
+      build3DDice();
+      setupTouchAndPointerControls(canvasEl);
       window.addEventListener('resize', onWindowResize);
 
       animate3D();
     }
 
-    function setCameraView(topDown) {
-      if (topDown) {
-        // Vista tattica planimetrica (ortogonale dall'alto)
-        camera.position.set(5.5, 20, 6.2);
-        camera.lookAt(5.5, 0, 5.5);
+    function updateCameraOrbitPosition() {
+      if (isTopDownView) {
+        camera.position.set(cameraTarget.x, 22, cameraTarget.z + 0.01);
+        camera.lookAt(cameraTarget);
       } else {
-        // Vista 3D immersiva isometrica
-        camera.position.set(5.5, 14, 15.5);
-        camera.lookAt(5.5, 0, 5.8);
+        camera.position.x = cameraTarget.x + cameraOrbit.radius * Math.sin(cameraOrbit.phi) * Math.sin(cameraOrbit.theta);
+        camera.position.y = cameraOrbit.radius * Math.cos(cameraOrbit.phi);
+        camera.position.z = cameraTarget.z + cameraOrbit.radius * Math.sin(cameraOrbit.phi) * Math.cos(cameraOrbit.theta);
+        camera.lookAt(cameraTarget);
       }
     }
 
     function toggle3DView() {
       isTopDownView = !isTopDownView;
-      setCameraView(isTopDownView);
+      updateCameraOrbitPosition();
     }
 
     function build3DMansion() {
       const tileGeo = new THREE.BoxGeometry(0.94, 0.2, 0.94);
       const wallGeo = new THREE.BoxGeometry(0.96, 0.8, 0.96);
 
-      // Crea le 12x12 celle della villa
       for (let y = 0; y < 12; y++) {
         for (let x = 0; x < 12; x++) {
           const cell = BOARD_GRID[y][x];
@@ -1539,14 +1746,11 @@
           let isWall = false;
 
           if (cell === 0) {
-            // Corridoio piastrellato scuro
             color = ((x + y) % 2 === 0) ? 0x1f293d : 0x151f30;
           } else if (cell === 1) {
-            // Muro centrale inaccessibile
             color = 0x090d16;
             isWall = true;
           } else {
-            // Stanza colorata nobiliare
             color = ROOM_COLORS[cell] || 0x334155;
           }
 
@@ -1565,7 +1769,6 @@
           scene.add(mesh);
           boardTiles3D.push(mesh);
 
-          // Aggiungi porte 3D in ottone
           const isDoor = ROOM_DOORS.some(d => d.x === x && d.y === y);
           if (isDoor) {
             const doorFrameGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
@@ -1578,23 +1781,166 @@
       }
     }
 
+    /* 3D DECORAZIONI ARREDO PROCEDURALE DELLE STANZE */
+    function buildRoomDecorations() {
+      // 1. Tavolo da Biliardo verde in Sala da Biliardo (Stanza 6: centro x:10, y:5)
+      const poolTableGroup = new THREE.Group();
+      const poolTopGeo = new THREE.BoxGeometry(1.6, 0.15, 0.9);
+      const poolMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+      const poolTop = new THREE.Mesh(poolTopGeo, poolMat);
+      poolTop.position.y = 0.5;
+      poolTableGroup.add(poolTop);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.5 });
+      const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8);
+      [[-0.7, -0.35], [0.7, -0.35], [-0.7, 0.35], [0.7, 0.35]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(lx, 0.25, lz);
+        poolTableGroup.add(leg);
+      });
+      poolTableGroup.position.set(10, 0.1, 5);
+      scene.add(poolTableGroup);
+
+      // 2. Bancone con Fornelli in Cucina (Stanza 2: centro x:1, y:1)
+      const kitchenCounterGeo = new THREE.BoxGeometry(1.2, 0.45, 0.6);
+      const kitchenMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.6 });
+      const kitchenCounter = new THREE.Mesh(kitchenCounterGeo, kitchenMat);
+      kitchenCounter.position.set(1.2, 0.35, 1.2);
+      scene.add(kitchenCounter);
+
+      // 3. Scaffale della Biblioteca (Stanza 9: centro x:10, y:9.5)
+      const shelfGeo = new THREE.BoxGeometry(0.3, 0.9, 1.8);
+      const shelfMat = new THREE.MeshStandardMaterial({ color: 0x291b12, roughness: 0.9 });
+      const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+      shelf.position.set(11.2, 0.55, 9.5);
+      scene.add(shelf);
+
+      // 4. Caminetto Acceso in Salotto (Stanza 7: centro x:1, y:9.5)
+      const fireplaceGeo = new THREE.BoxGeometry(0.4, 0.7, 1.1);
+      const fireplaceMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.8 });
+      const fireplace = new THREE.Mesh(fireplaceGeo, fireplaceMat);
+      fireplace.position.set(0.6, 0.45, 9.5);
+      scene.add(fireplace);
+
+      const fireLight = new THREE.PointLight(0xf97316, 0.9, 4);
+      fireLight.position.set(0.8, 0.5, 9.5);
+      scene.add(fireLight);
+    }
+
+    /* 3D ARMI PROCEDURALI */
+    function build3DWeapons() {
+      const weaponTypes = ['Candeliere', 'Pugnale', 'Tubo di Piombo', 'Rivoltella', 'Corda', 'Chiave Inglese'];
+      weaponTypes.forEach(w => {
+        const group = new THREE.Group();
+        if (w === 'Candeliere') {
+          const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.08, 0.35, 8), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8 }));
+          group.add(stem);
+        } else if (w === 'Pugnale') {
+          const blade = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.4, 4), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.1 }));
+          blade.rotation.z = Math.PI;
+          group.add(blade);
+        } else if (w === 'Tubo di Piombo') {
+          const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.45, 8), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.7 }));
+          pipe.rotation.z = Math.PI / 3;
+          group.add(pipe);
+        } else if (w === 'Rivoltella') {
+          const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 }));
+          const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.06), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+          handle.position.set(-0.1, -0.09, 0);
+          group.add(barrel);
+          group.add(handle);
+        } else if (w === 'Corda') {
+          const torus = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.05, 8, 16), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.9 }));
+          group.add(torus);
+        } else if (w === 'Chiave Inglese') {
+          const wrench = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.04), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 }));
+          wrench.rotation.z = Math.PI / 4;
+          group.add(wrench);
+        }
+
+        group.position.set(0, 0.25, 0);
+        group.scale.set(0.85, 0.85, 0.85);
+        scene.add(group);
+        weaponMeshes3D[w] = group;
+      });
+    }
+
+    /* 3D DADI ANIMATI (2d6) */
+    function build3DDice() {
+      const diceGeo = new THREE.BoxGeometry(0.65, 0.65, 0.65);
+      const diceMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2, metalness: 0.1 });
+      dice3D_1 = new THREE.Mesh(diceGeo, diceMat);
+      dice3D_2 = new THREE.Mesh(diceGeo, diceMat);
+      dice3D_1.position.set(5.2, -5, 5.5);
+      dice3D_2.position.set(6.0, -5, 5.5);
+      scene.add(dice3D_1);
+      scene.add(dice3D_2);
+    }
+
+    function triggerDiceRollAnimation(val1, val2) {
+      if (!dice3D_1 || !dice3D_2) return;
+      dice3D_1.position.set(5.0, 3.5, 5.2);
+      dice3D_2.position.set(6.2, 3.5, 5.8);
+
+      const startTime = performance.now();
+      const animDice = () => {
+        const elapsed = (performance.now() - startTime) / 1000;
+        if (elapsed < 0.6) {
+          dice3D_1.rotation.x += 0.4;
+          dice3D_1.rotation.y += 0.3;
+          dice3D_2.rotation.x += 0.35;
+          dice3D_2.rotation.y += 0.45;
+          dice3D_1.position.y = Math.max(0.4, 3.5 - elapsed * 5);
+          dice3D_2.position.y = Math.max(0.4, 3.5 - elapsed * 5);
+          requestAnimationFrame(animDice);
+        } else {
+          dice3D_1.position.y = 0.4;
+          dice3D_2.position.y = 0.4;
+          // Imposta rotazione finale simbolica in base al valore
+          dice3D_1.rotation.set(val1 * 0.5, val1 * 0.8, 0);
+          dice3D_2.rotation.set(val2 * 0.5, val2 * 0.8, 0);
+        }
+      };
+      animDice();
+    }
+
+    /* AGGIORNAMENTO POSIZIONI E DISPERSIONE PEDINE NELLE STANZE */
     function update3DBoard() {
       if (!scene) return;
 
-      // Aggiorna o crea le pedine 3D dei detective
+      // 1. Raggruppa i detective per stanza o casella per calcolare l'offset ed evitare sovrapposizioni
+      const roomCounts = {};
       gameState.players.forEach(p => {
+        const cell = BOARD_GRID[p.y] ? BOARD_GRID[p.y][p.x] : 0;
+        const groupKey = cell > 1 ? `room_${cell}` : `tile_${p.x}_${p.y}`;
+        if (!roomCounts[groupKey]) roomCounts[groupKey] = [];
+        roomCounts[groupKey].push(p);
+      });
+
+      // 2. Posiziona le pedine applicando un raggio d'offset se ce ne sono molteplici nello stesso spazio
+      gameState.players.forEach(p => {
+        const cell = BOARD_GRID[p.y] ? BOARD_GRID[p.y][p.x] : 0;
+        const groupKey = cell > 1 ? `room_${cell}` : `tile_${p.x}_${p.y}`;
+        const roommates = roomCounts[groupKey] || [];
+        const indexInRoom = roommates.indexOf(p);
+        let offsetX = 0;
+        let offsetZ = 0;
+
+        if (roommates.length > 1) {
+          const angle = (indexInRoom / roommates.length) * Math.PI * 2;
+          offsetX = Math.cos(angle) * 0.38;
+          offsetZ = Math.sin(angle) * 0.38;
+        }
+
         if (!playerPawns3D[p.id]) {
-          // Creazione mesh pedina classica stile Cluedo torneata
           const pawnGroup = new THREE.Group();
 
-          // Base metallica
           const baseGeo = new THREE.CylinderGeometry(0.32, 0.38, 0.15, 16);
           const baseMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.8, roughness: 0.2 });
           const base = new THREE.Mesh(baseGeo, baseMat);
           base.position.y = 0.15;
           pawnGroup.add(base);
 
-          // Corpo tornito colorato del detective
           const bodyGeo = new THREE.ConeGeometry(0.24, 0.65, 16);
           const bodyMat = new THREE.MeshStandardMaterial({
             color: p.hex || 0xffffff,
@@ -1605,41 +1951,111 @@
           body.position.y = 0.52;
           pawnGroup.add(body);
 
-          // Testa sferica
           const headGeo = new THREE.SphereGeometry(0.18, 16, 16);
           const head = new THREE.Mesh(headGeo, bodyMat);
           head.position.y = 0.92;
           pawnGroup.add(head);
 
-          // Spotlight personale della pedina
           const light = new THREE.PointLight(p.hex || 0xffffff, 0.6, 3);
           light.position.y = 1.3;
           pawnGroup.add(light);
 
-          pawnGroup.position.set(p.x, 0, p.y);
+          pawnGroup.position.set(p.x + offsetX, 0, p.y + offsetZ);
           scene.add(pawnGroup);
           playerPawns3D[p.id] = pawnGroup;
         } else {
-          // Movimento fluido verso le nuove coordinate
           const pawn = playerPawns3D[p.id];
-          pawn.position.x = p.x;
-          pawn.position.z = p.y;
+          pawn.position.x = p.x + offsetX;
+          pawn.position.z = p.y + offsetZ;
           pawn.position.y = p.eliminated ? -0.2 : 0;
         }
       });
+
+      // 3. Posiziona le armi 3D nelle stanze appropriate
+      const roomCenters = {
+        'Cucina': { x: 1.5, z: 1.5 },
+        'Sala da Ballo': { x: 5.5, z: 1.5 },
+        'Veranda': { x: 10.5, z: 1.5 },
+        'Sala da Pranzo': { x: 1.5, z: 5.5 },
+        'Sala da Biliardo': { x: 10.5, z: 5.5 },
+        'Salotto': { x: 1.5, z: 9.5 },
+        'Ingresso': { x: 5.5, z: 9.5 },
+        'Biblioteca': { x: 10.5, z: 9.5 },
+        'Studio': { x: 5.5, z: 11.0 }
+      };
+
+      if (gameState.weaponPositions) {
+        Object.entries(gameState.weaponPositions).forEach(([wName, rName]) => {
+          const wMesh = weaponMeshes3D[wName];
+          const center = roomCenters[rName];
+          if (wMesh && center) {
+            wMesh.position.x = center.x + 0.3;
+            wMesh.position.z = center.z + 0.3;
+            wMesh.position.y = 0.3;
+          }
+        });
+      }
     }
 
-    function setupPointerControls(canvasEl) {
-      function handlePointer(event) {
+    /* CONTROLLI TOUCH MULTIPLI: ORBIT, PINCH-TO-ZOOM & SELEZIONE RAPIDA BFS */
+    function setupTouchAndPointerControls(canvasEl) {
+      let touchMoved = false;
+
+      canvasEl.addEventListener('touchstart', (e) => {
+        touchMoved = false;
+        if (e.touches.length === 1) {
+          isTouching = true;
+          previousTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          touchStartDist = Math.hypot(dx, dy);
+        }
+      }, { passive: true });
+
+      canvasEl.addEventListener('touchmove', (e) => {
+        touchMoved = true;
+        if (isTopDownView) return; // In vista dall'alto blocca l'inclinazione
+
+        if (e.touches.length === 1 && isTouching) {
+          const deltaX = e.touches[0].clientX - previousTouchPos.x;
+          const deltaY = e.touches[0].clientY - previousTouchPos.y;
+
+          cameraOrbit.theta -= deltaX * 0.007;
+          cameraOrbit.phi = Math.max(0.2, Math.min(Math.PI / 2.1, cameraOrbit.phi - deltaY * 0.007));
+
+          previousTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          updateCameraOrbitPosition();
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const currentDist = Math.hypot(dx, dy);
+          const factor = touchStartDist / currentDist;
+
+          cameraOrbit.radius = Math.max(9, Math.min(32, cameraOrbit.radius * (factor > 1 ? 1.02 : 0.98)));
+          touchStartDist = currentDist;
+          updateCameraOrbitPosition();
+        }
+      }, { passive: true });
+
+      canvasEl.addEventListener('touchend', (e) => {
+        isTouching = false;
+        // Se è stato un tocco pulito senza trascinamento (Tap), gestisci la selezione casella
+        if (!touchMoved && e.changedTouches.length > 0) {
+          handleTilePick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        }
+      });
+
+      // Supporto Mouse Click per PC / Desktop
+      canvasEl.addEventListener('click', (e) => {
+        handleTilePick(e.clientX, e.clientY);
+      });
+
+      function handleTilePick(clientX, clientY) {
         const activePlayer = gameState.players[gameState.turnIndex];
         if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0 || gameState.activeSuggestion || activePlayer.eliminated) return;
 
         const rect = canvasEl.getBoundingClientRect();
-        const clientX = event.clientX || (event.touches && event.touches[0].clientX);
-        const clientY = event.clientY || (event.touches && event.touches[0].clientY);
-
-        if (!clientX || !clientY) return;
-
         mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -1650,15 +2066,17 @@
           const hitTile = intersects[0].object;
           const { gridX, gridY } = hitTile.userData;
 
-          if (isHost) {
-            executeMove(myId, gridX, gridY);
-          } else {
-            hostConn.send({ type: 'ACTION_MOVE', x: gridX, y: gridY });
+          // Verifica che la casella toccata appartenga alle destinazioni raggiungibili con il dado
+          const isReachable = reachableTiles.some(t => t.x === gridX && t.y === gridY);
+          if (isReachable) {
+            if (isHost) {
+              executePathMove(myId, gridX, gridY);
+            } else {
+              hostConn.send({ type: 'ACTION_MOVE_PATH', targetX: gridX, targetY: gridY });
+            }
           }
         }
       }
-
-      canvasEl.addEventListener('pointerdown', handlePointer);
     }
 
     function onWindowResize() {
@@ -1673,11 +2091,18 @@
     function animate3D() {
       requestAnimationFrame(animate3D);
 
-      // Piccola oscillazione della luce e rotazione leggera delle pedine attive
       const time = performance.now() * 0.002;
       const activePlayer = gameState.players[gameState.turnIndex];
       if (activePlayer && playerPawns3D[activePlayer.id]) {
         playerPawns3D[activePlayer.id].position.y = Math.sin(time * 3) * 0.08;
+      }
+
+      // Leggera levitazione e rotazione delle armi 3D
+      if (weaponMeshes3D) {
+        Object.values(weaponMeshes3D).forEach((wm, idx) => {
+          wm.rotation.y += 0.015;
+          wm.position.y = 0.3 + Math.sin(time * 2 + idx) * 0.04;
+        });
       }
 
       renderer.render(scene, camera);
@@ -1848,11 +2273,15 @@
        ===================================================================== */
     function rollDice() {
       SoundEngine.dice();
+      triggerHaptic([40, 60]);
       if (isHost) {
         const active = gameState.players[gameState.turnIndex];
         if (active && active.id === myId && gameState.stepsLeft === 0 && !gameState.activeSuggestion && !active.eliminated) {
-          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
-          broadcastLog(`${myName} ha tirato il dado: ${gameState.stepsLeft}`);
+          gameState.diceVal1 = Math.floor(Math.random() * 6) + 1;
+          gameState.diceVal2 = Math.floor(Math.random() * 6) + 1;
+          gameState.stepsLeft = gameState.diceVal1 + gameState.diceVal2;
+          triggerDiceRollAnimation(gameState.diceVal1, gameState.diceVal2);
+          broadcastLog(`${myName} ha lanciato 2 dadi: [${gameState.diceVal1} + ${gameState.diceVal2}] = ${gameState.stepsLeft}`);
           broadcastState();
         }
       } else {
@@ -2055,12 +2484,12 @@
         passageBtn.disabled = !myRoom || !SECRET_PASSAGES[myRoom];
 
         if (gameState.stepsLeft > 0) {
-          statusDiv.innerHTML = `🎯 <strong>Tocca a te (${me.charName})!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca una casella adiacente sul tabellone)`;
+          statusDiv.innerHTML = `🎯 <strong>Tocca a te (${me.charName})!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca direttamente una casella evidenziata in verde)`;
           diceBtn.disabled = true;
         } else {
           statusDiv.innerHTML = myRoom 
             ? `🏰 Ti trovi in <strong>${myRoom}</strong>. Puoi formulare un'ipotesi o passare.`
-            : `🎲 <strong>Tocca a te (${me.charName})!</strong> Lancia il dado per muoverti.`;
+            : `🎲 <strong>Tocca a te (${me.charName})!</strong> Lancia i 2 dadi per muoverti.`;
           diceBtn.disabled = false;
         }
       } else {
