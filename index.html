@@ -53,13 +53,22 @@ button:disabled {
   text-align: center;
 }
 .room-code-tag {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: #f59e0b;
   user-select: all;
   word-break: break-all;
-  margin: 6px 0;
+  margin: 8px 0;
   letter-spacing: 0.5px;
+}
+.copy-btn {
+  background: #334155;
+  color: #f8fafc;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  margin-top: 4px;
 }
 .player-list {
   list-style: none;
@@ -67,6 +76,8 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
   margin: 10px 0;
+  max-height: 220px;
+  overflow-y: auto;
 }
 .player-item {
   display: flex;
@@ -129,9 +140,7 @@ canvas {
   <span id="player-count" style="font-size: 13px; color: #f59e0b;">0/6</span>
 </div>
 
-<ul class="player-list" id="player-list-ul">
-  <!-- Elementi aggiunti dinamicamente -->
-</ul>
+<ul class="player-list" id="player-list-ul"></ul>
 
 <div id="host-start-container" style="display: none; margin-top: 8px;">
   <button onclick="startGame()" style="background: #10b981; color: #000;">AVVIA PARTITA</button>
