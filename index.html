@@ -1,203 +1,79 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Cluedo P2P WebRTC</title>
-  <!-- Libreria CDN ufficiale PeerJS -->
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <style>
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-      touch-action: manipulation; 
-    }
-    body { 
-      background: #0f172a; 
-      color: #f8fafc; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      min-height: 100vh; 
-      padding: 14px; 
-    }
-    
-    .panel { 
-      background: #1e293b; 
-      padding: 20px; 
-      border-radius: 12px; 
-      width: 100%; 
-      max-width: 380px; 
-      margin-top: 20px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 12px; 
-      border: 1px solid #334155; 
-      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-    }
-    
-    input, button { 
-      padding: 12px 14px; 
-      border-radius: 8px; 
-      border: none; 
-      font-size: 15px; 
-      width: 100%; 
-    }
-    input { 
-      background: #0f172a; 
-      color: #fff; 
-      border: 1px solid #475569; 
-    }
-    input:focus {
-      outline: 2px solid #f59e0b;
-    }
-    
-    button { 
-      background: #f59e0b; 
-      color: #000; 
-      font-weight: 700; 
-      cursor: pointer; 
-      transition: opacity 0.2s;
-    }
-    button:active { 
-      opacity: 0.85; 
-    }
-    button:disabled { 
-      background: #475569; 
-      color: #94a3b8; 
-      cursor: not-allowed; 
-    }
-
-    /* Stile Sala d'Attesa */
-    .room-header {
-      background: #0f172a;
-      border: 1px dashed #f59e0b;
-      border-radius: 10px;
-      padding: 14px;
-      text-align: center;
-    }
-    .room-code-tag {
-      font-size: 17px;
-      font-weight: 800;
-      color: #f59e0b;
-      user-select: all;
-      word-break: break-all;
-      margin: 8px 0;
-      letter-spacing: 0.5px;
-    }
-    .copy-btn {
-      background: #334155;
-      color: #f8fafc;
-      font-size: 13px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-    .player-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin: 10px 0;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .player-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #0f172a;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid #334155;
-      font-size: 14px;
-    }
-    .color-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid #ffffff;
-      flex-shrink: 0;
-    }
-
-    /* Schermata Tabellone */
-    #game-container { 
-      display: none; 
-      flex-direction: column; 
-      align-items: center; 
-      width: 100%; 
-      max-width: 400px; 
-      gap: 12px; 
-      margin-top: 10px; 
-    }
-    #status { 
-      width: 100%; 
-      background: #1e293b; 
-      padding: 12px; 
-      border-radius: 8px; 
-      font-size: 14px; 
-      text-align: center; 
-      border-left: 4px solid #f59e0b; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    canvas { 
-      background: #020617; 
-      border: 2px solid #334155; 
-      border-radius: 8px; 
-      box-shadow: 0 6px 18px rgba(0,0,0,0.5); 
-    }
-  </style>
-</head>
-<body>
-
+<!-- ... existing code ... -->
   <!-- 1. LOBBY INIZIALE -->
   <div id="lobby-screen" class="panel">
     <h3 style="color: #f59e0b; text-align: center; letter-spacing: 1px;">CLUEDO P2P</h3>
     <input type="text" id="username" placeholder="Inserisci il tuo nome">
     
     <div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
+      <input type="text" id="hostPassword" placeholder="Password stanza (opzionale)">
       <button onclick="createGame()">CREA STANZA (HOST)</button>
       
       <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
       
       <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
+      <input type="password" id="joinPassword" placeholder="Password stanza (se richiesta)">
       <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
     </div>
   </div>
 
   <!-- 2. SALA D'ATTESA (WAITING ROOM) -->
-  <div id="waiting-screen" class="panel" style="display: none;">
-    <div class="room-header">
-      <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase;">Codice Stanza</div>
-      <div class="room-code-tag" id="display-room-code">GENERAZIONE...</div>
-      <button class="copy-btn" onclick="copyRoomCode()">Copia Codice</button>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
-      <span style="font-weight: 600; font-size: 14px;">Giocatori connessi:</span>
-      <span id="player-count" style="font-size: 13px; color: #f59e0b;">0/6</span>
-    </div>
-
-    <ul class="player-list" id="player-list-ul"></ul>
-
-    <div id="host-start-container" style="display: none; margin-top: 8px;">
-      <button onclick="startGame()" style="background: #10b981; color: #000;">AVVIA PARTITA</button>
-    </div>
-    <div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; padding: 6px;">
-      In attesa che l'Host avvii la partita...
-    </div>
-  </div>
-
+<!-- ... existing code ... -->
   <!-- 3. AREA DI GIOCO -->
   <div id="game-container">
     <div id="status">In attesa dell'inizio...</div>
     <canvas id="board"></canvas>
-    <button id="diceBtn" onclick="rollDice()" disabled>TIRA IL DADO</button>
+    <div style="width: 100%; display: flex; gap: 8px;">
+      <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1;">TIRA IL DADO</button>
+      <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1; background: #8b5cf6; color: #fff;">FORMULA IPOTESI</button>
+    </div>
+    
+    <!-- Barra rapida schede e taccuino -->
+    <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+      <button onclick="openModal('cards-modal')" style="background: #334155; color: #f8fafc; font-size: 13px; padding: 10px;">🎴 Le Mie Carte</button>
+      <button onclick="openModal('sheet-modal')" style="background: #334155; color: #f8fafc; font-size: 13px; padding: 10px;">📝 Taccuino</button>
+    </div>
   </div>
 
+  <!-- MODALE FORMULA IPOTESI (CHIAMATA) -->
+  <div id="suggest-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color: #a78bfa;">Formula Ipotesi (Chiamata)</h3>
+        <button class="close-btn" onclick="closeModal('suggest-modal')">&times;</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+        <div>
+          <label style="font-size: 12px; color: #94a3b8;">Sospettato:</label>
+          <select id="suggestSuspect" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94a3b8;">Arma:</label>
+          <select id="suggestWeapon" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94a3b8;">Stanza:</label>
+          <select id="suggestRoom" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+        </div>
+        <button onclick="submitSuggestion()" style="background: #8b5cf6; color: #fff; margin-top: 8px; padding: 12px;">INVIA CHIAMATA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE RISPOSTA CHIAMATA (PER IL GIOCATORE INTERROGATO) -->
+  <div id="disprove-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color: #f59e0b;">Chiamata in corso!</h3>
+      </div>
+      <div id="disprove-banner" style="background: #0f172a; border-left: 4px solid #8b5cf6; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">Seleziona una carta da mostrare in segreto:</div>
+      <div id="disprove-cards-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      <button id="disprove-none-btn" onclick="passDisprove()" style="background: #475569; color: #fff; margin-top: 12px; font-size: 13px; padding: 10px;">NON HO NESSUNA CARTA</button>
+    </div>
+  </div>
+
+  <!-- MODALE LE MIE CARTE -->
+<!-- ... existing code ... -->
   <script>
     let peer = null;
     let isHost = false;
@@ -205,12 +81,34 @@
     let hostConn = null;
     let myId = null;
     let myName = '';
+    let roomPassword = '';
     
     let gameState = {
       started: false,
       players: [],
       turnIndex: 0,
-      stepsLeft: 0
+      stepsLeft: 0,
+      activeSuggestion: null // Stato chiamata in corso
+    };
+
+    let myCards = [];
+    let secretCaseFile = null;
+    let notebookState = {};
+
+    const ALL_CARDS = {
+      suspects: [
+        'Miss Scarlett', 'Colonnello Mustard', 'Dottor Orchid', 
+        'Reverendo Green', 'Signora Peacock', 'Professor Plum'
+      ],
+      weapons: [
+        'Candeliere', 'Pugnale', 'Tubo di Piombo', 
+        'Rivoltella', 'Corda', 'Chiave Inglese'
+      ],
+      rooms: [
+        'Cucina', 'Sala da Ballo', 'Veranda', 
+        'Sala da Pranzo', 'Sala da Biliardo', 'Salotto', 
+        'Studio', 'Biblioteca', 'Ingresso'
+      ]
     };
 
     const TILE = 30;
@@ -222,7 +120,6 @@
 
     const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-    // Opzioni PeerJS con server STUN ufficiali di Google per l'attraversamento NAT mobile
     const PEER_CONFIG = {
       config: {
         iceServers: [
@@ -235,6 +132,7 @@
     // 1. CREAZIONE STANZA (HOST)
     function createGame() {
       myName = document.getElementById('username').value.trim() || 'Host';
+      roomPassword = document.getElementById('hostPassword').value.trim();
       isHost = true;
 
       showWaitingScreen();
@@ -244,7 +142,7 @@
       try {
         peer = new Peer(PEER_CONFIG);
       } catch (err) {
-        alert('Errore PeerJS. Assicurati di eseguire il file tramite HTTPS o server locale.');
+        showCustomAlert('Errore PeerJS. Esegui il file tramite HTTPS o server locale.');
         return;
       }
 
@@ -257,8 +155,7 @@
       });
 
       peer.on('error', (err) => {
-        console.error('Errore PeerJS:', err);
-        alert('Errore di connessione: ' + err.type);
+        showCustomAlert('Errore di connessione: ' + err.type);
       });
 
       peer.on('connection', (conn) => {
@@ -281,7 +178,8 @@
     function joinGame() {
       myName = document.getElementById('username').value.trim() || 'Ospite';
       const targetHostId = document.getElementById('joinId').value.trim();
-      if (!targetHostId) return alert('Incolla il codice stanza generato dall\'Host');
+      const enteredPass = document.getElementById('joinPassword').value.trim();
+      if (!targetHostId) return showCustomAlert('Incolla il codice stanza generato dall\'Host');
 
       isHost = false;
       showWaitingScreen();
@@ -295,10 +193,17 @@
         hostConn = peer.connect(targetHostId);
 
         hostConn.on('open', () => {
-          hostConn.send({ type: 'JOIN', name: myName });
+          hostConn.send({ type: 'JOIN', name: myName, password: enteredPass });
         });
 
         hostConn.on('data', (data) => {
+          if (data.type === 'AUTH_FAILED') {
+            showCustomAlert('Password errata per questa stanza!');
+            document.getElementById('waiting-screen').style.display = 'none';
+            document.getElementById('lobby-screen').style.display = 'flex';
+            peer.destroy();
+            return;
+          }
           if (data.type === 'SYNC') {
             gameState = data.state;
             if (gameState.started) {
@@ -308,21 +213,38 @@
               updateWaitingRoomUI();
             }
           }
+          if (data.type === 'DEAL_CARDS') {
+            myCards = data.cards;
+            renderMyCards();
+            initNotebook();
+          }
+          if (data.type === 'PROMPT_DISPROVE') {
+            openDisproveModal(data.suggestion);
+          }
+          if (data.type === 'SUGGESTION_RESULT') {
+            handleSuggestionResult(data);
+          }
         });
 
-        hostConn.on('error', (err) => {
-          alert('Impossibile collegarsi alla stanza. Verifica il codice.');
+        hostConn.on('error', () => {
+          showCustomAlert('Impossibile collegarsi alla stanza. Verifica il codice.');
         });
       });
 
       peer.on('error', (err) => {
-        alert('Errore Peer: ' + err.type);
+        showCustomAlert('Errore Peer: ' + err.type);
       });
     }
 
     // 3. LOGICA DI GIOCO SUL TELEFONO DELL'HOST
     function handleIncomingMessageAsHost(data, conn) {
       if (data.type === 'JOIN') {
+        if (roomPassword && data.password !== roomPassword) {
+          conn.send({ type: 'AUTH_FAILED' });
+          setTimeout(() => conn.close(), 500);
+          return;
+        }
+
         const pIndex = gameState.players.length;
         const color = COLORS[pIndex % COLORS.length];
         const spawns = [{x: 0, y: 0}, {x: 9, y: 0}, {x: 0, y: 9}, {x: 9, y: 9}, {x: 4, y: 0}, {x: 4, y: 9}];
@@ -342,7 +264,7 @@
       }
 
       if (data.type === 'ACTION_ROLL') {
-        if (gameState.players[gameState.turnIndex].id === conn.peer && gameState.stepsLeft === 0) {
+        if (gameState.players[gameState.turnIndex].id === conn.peer && gameState.stepsLeft === 0 && !gameState.activeSuggestion) {
           gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
           broadcastState();
         }
@@ -351,21 +273,278 @@
       if (data.type === 'ACTION_MOVE') {
         executeMove(conn.peer, data.x, data.y);
       }
+
+      if (data.type === 'START_SUGGESTION') {
+        initiateSuggestion(conn.peer, data.suggestion);
+      }
+
+      if (data.type === 'DISPROVE_RESPONSE') {
+        processDisproveResponse(conn.peer, data.card, data.hasCard);
+      }
     }
 
     function startGame() {
       if (!isHost) return;
-      if (gameState.players.length < 1) return alert('Attendi almeno un giocatore');
+      if (gameState.players.length < 1) return showCustomAlert('Attendi almeno un giocatore');
 
+      distributeCardsAndSetCaseFile();
       gameState.started = true;
       broadcastState();
       showGameView();
       updateUI();
     }
 
+    function distributeCardsAndSetCaseFile() {
+      const suspects = [...ALL_CARDS.suspects];
+      const weapons = [...ALL_CARDS.weapons];
+      const rooms = [...ALL_CARDS.rooms];
+
+      const rSuspect = suspects.splice(Math.floor(Math.random() * suspects.length), 1)[0];
+      const rWeapon = weapons.splice(Math.floor(Math.random() * weapons.length), 1)[0];
+      const rRoom = rooms.splice(Math.floor(Math.random() * rooms.length), 1)[0];
+
+      secretCaseFile = { suspect: rSuspect, weapon: rWeapon, room: rRoom };
+
+      let deck = [...suspects, ...weapons, ...rooms];
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+
+      const hands = {};
+      gameState.players.forEach(p => hands[p.id] = []);
+
+      let pIdx = 0;
+      while (deck.length > 0) {
+        hands[gameState.players[pIdx].id].push(deck.pop());
+        pIdx = (pIdx + 1) % gameState.players.length;
+      }
+
+      myCards = hands[myId] || [];
+      renderMyCards();
+      initNotebook();
+
+      connections.forEach(conn => {
+        if (conn.open && hands[conn.peer]) {
+          conn.send({ type: 'DEAL_CARDS', cards: hands[conn.peer] });
+        }
+      });
+    }
+
+    // --- GESTIONE CHIAMATA (SUGGESTION) A GIRO ORARIO ---
+    function initiateSuggestion(callerId, suggestion) {
+      const callerIndex = gameState.players.findIndex(p => p.id === callerId);
+      if (callerIndex === -1) return;
+
+      gameState.activeSuggestion = {
+        callerId: callerId,
+        callerName: gameState.players[callerIndex].name,
+        suggestion: suggestion,
+        currentRespondentIndex: (callerIndex + 1) % gameState.players.length,
+        startIndex: callerIndex
+      };
+
+      broadcastState();
+      askNextRespondent();
+    }
+
+    function askNextRespondent() {
+      const act = gameState.activeSuggestion;
+      if (!act) return;
+
+      // Se il giro completo è finito e nessuno ha risposto
+      if (act.currentRespondentIndex === act.startIndex) {
+        sendToPlayer(act.callerId, {
+          type: 'SUGGESTION_RESULT',
+          callerId: act.callerId,
+          disproved: false,
+          card: null,
+          responderName: null
+        });
+
+        broadcastExceptCaller(act.callerId, {
+          type: 'SUGGESTION_RESULT',
+          callerId: act.callerId,
+          disproved: false,
+          responderName: null
+        });
+
+        endSuggestionTurn();
+        return;
+      }
+
+      const targetPlayer = gameState.players[act.currentRespondentIndex];
+
+      if (targetPlayer.id === myId) {
+        openDisproveModal(act.suggestion);
+      } else {
+        const conn = connections.find(c => c.peer === targetPlayer.id);
+        if (conn && conn.open) {
+          conn.send({ type: 'PROMPT_DISPROVE', suggestion: act.suggestion });
+        }
+      }
+    }
+
+    function processDisproveResponse(respondentId, card, hasCard) {
+      const act = gameState.activeSuggestion;
+      if (!act) return;
+
+      const respondent = gameState.players.find(p => p.id === respondentId);
+      const respondentName = respondent ? respondent.name : 'Un giocatore';
+
+      if (hasCard && card) {
+        // Carta mostrata in privato ESCLUSIVAMENTE al chiamante
+        sendToPlayer(act.callerId, {
+          type: 'SUGGESTION_RESULT',
+          callerId: act.callerId,
+          disproved: true,
+          card: card,
+          responderName: respondentName
+        });
+
+        // Agli altri si notifica che l'ipotesi è stata smentita senza mostrare la carta
+        broadcastExceptCaller(act.callerId, {
+          type: 'SUGGESTION_RESULT',
+          callerId: act.callerId,
+          disproved: true,
+          card: null,
+          responderName: respondentName
+        });
+
+        endSuggestionTurn();
+      } else {
+        // Il giocatore passa; si interroga il successivo a sinistra (senso orario)
+        act.currentRespondentIndex = (act.currentRespondentIndex + 1) % gameState.players.length;
+        askNextRespondent();
+      }
+    }
+
+    function endSuggestionTurn() {
+      gameState.activeSuggestion = null;
+      gameState.stepsLeft = 0;
+      gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+      broadcastState();
+    }
+
+    function sendToPlayer(playerId, message) {
+      if (playerId === myId) {
+        if (message.type === 'SUGGESTION_RESULT') handleSuggestionResult(message);
+      } else {
+        const conn = connections.find(c => c.peer === playerId);
+        if (conn && conn.open) conn.send(message);
+      }
+    }
+
+    function broadcastExceptCaller(callerId, message) {
+      if (myId !== callerId) {
+        if (message.type === 'SUGGESTION_RESULT') handleSuggestionResult(message);
+      }
+      connections.forEach(conn => {
+        if (conn.open && conn.peer !== callerId) {
+          conn.send(message);
+        }
+      });
+    }
+
+    function handleSuggestionResult(data) {
+      if (data.callerId === myId) {
+        if (data.disproved) {
+          showCustomAlert(`🕵️ ${data.responderName} ti ha mostrato in segreto la carta:\n👉 [ ${data.card} ]`);
+        } else {
+          showCustomAlert(`🔍 Nessun giocatore ha potuto smentire la tua ipotesi! Nessuno possiede quelle 3 carte.`);
+        }
+      } else {
+        if (data.disproved) {
+          showCustomAlert(`ℹ️ ${data.responderName} ha mostrato una carta segreta a chi ha fatto la chiamata.`);
+        } else {
+          showCustomAlert(`ℹ️ Nessun giocatore ha potuto smentire l'ipotesi formulata.`);
+        }
+      }
+    }
+
+    // --- INTERFACCIA CHIAMATA E RISPOSTA ---
+    function openSuggestModal() {
+      populateSuggestSelects();
+      openModal('suggest-modal');
+    }
+
+    function populateSuggestSelects() {
+      const sSelect = document.getElementById('suggestSuspect');
+      const wSelect = document.getElementById('suggestWeapon');
+      const rSelect = document.getElementById('suggestRoom');
+
+      sSelect.innerHTML = ALL_CARDS.suspects.map(s => `<option value="${s}">${s}</option>`).join('');
+      wSelect.innerHTML = ALL_CARDS.weapons.map(w => `<option value="${w}">${w}</option>`).join('');
+      rSelect.innerHTML = ALL_CARDS.rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+    }
+
+    function submitSuggestion() {
+      const suggestion = {
+        suspect: document.getElementById('suggestSuspect').value,
+        weapon: document.getElementById('suggestWeapon').value,
+        room: document.getElementById('suggestRoom').value
+      };
+
+      closeModal('suggest-modal');
+
+      if (isHost) {
+        initiateSuggestion(myId, suggestion);
+      } else {
+        hostConn.send({ type: 'START_SUGGESTION', suggestion: suggestion });
+      }
+    }
+
+    function openDisproveModal(sugg) {
+      const banner = document.getElementById('disprove-banner');
+      banner.innerHTML = `
+        <strong>Ipotesi da smentire:</strong><br>
+        👤 Sospettato: <strong>${sugg.suspect}</strong><br>
+        🔪 Arma: <strong>${sugg.weapon}</strong><br>
+        🚪 Stanza: <strong>${sugg.room}</strong>
+      `;
+
+      const listDiv = document.getElementById('disprove-cards-list');
+      listDiv.innerHTML = '';
+
+      const matchedCards = myCards.filter(c => c === sugg.suspect || c === sugg.weapon || c === sugg.room);
+
+      if (matchedCards.length > 0) {
+        matchedCards.forEach(card => {
+          const btn = document.createElement('button');
+          btn.textContent = `Mostra segretamente: ${card}`;
+          btn.style.cssText = 'background: #10b981; color: #000; font-weight: 700; padding: 12px; font-size: 14px;';
+          btn.onclick = () => {
+            closeModal('disprove-modal');
+            sendDisproveChoice(card, true);
+          };
+          listDiv.appendChild(btn);
+        });
+      } else {
+        const noMatchMsg = document.createElement('div');
+        noMatchMsg.textContent = 'Non hai nessuna delle carte richieste tra le tue.';
+        noMatchMsg.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic;';
+        listDiv.appendChild(noMatchMsg);
+      }
+
+      openModal('disprove-modal');
+    }
+
+    function passDisprove() {
+      closeModal('disprove-modal');
+      sendDisproveChoice(null, false);
+    }
+
+    function sendDisproveChoice(card, hasCard) {
+      if (isHost) {
+        processDisproveResponse(myId, card, hasCard);
+      } else {
+        hostConn.send({ type: 'DISPROVE_RESPONSE', card: card, hasCard: hasCard });
+      }
+    }
+
     function executeMove(playerId, targetX, targetY) {
       const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0) return;
+      if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0 || gameState.activeSuggestion) return;
 
       const dx = Math.abs(activePlayer.x - targetX);
       const dy = Math.abs(activePlayer.y - targetY);
@@ -374,10 +553,6 @@
         activePlayer.x = targetX;
         activePlayer.y = targetY;
         gameState.stepsLeft--;
-
-        if (gameState.stepsLeft === 0) {
-          gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-        }
 
         if (isHost) broadcastState();
       }
@@ -391,6 +566,7 @@
     }
 
     function rollDice() {
+      if (gameState.activeSuggestion) return;
       if (isHost) {
         if (gameState.players[gameState.turnIndex].id === myId && gameState.stepsLeft === 0) {
           gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
@@ -403,7 +579,7 @@
 
     canvas.addEventListener('pointerdown', (e) => {
       const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0) return;
+      if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0 || gameState.activeSuggestion) return;
 
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -466,11 +642,13 @@
 
     function copyRoomCode() {
       const code = document.getElementById('display-room-code').textContent;
-      navigator.clipboard.writeText(code).then(() => {
-        alert('Codice stanza copiato negli appunti!');
-      }).catch(() => {
-        prompt('Copia manualmente il codice:', code);
-      });
+      const tempInput = document.createElement('input');
+      tempInput.value = code;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      showCustomAlert('Codice stanza copiato negli appunti!');
     }
 
     function updateUI() {
@@ -481,13 +659,22 @@
       const isMyTurn = (activePlayer.id === myId);
       const statusDiv = document.getElementById('status');
       const diceBtn = document.getElementById('diceBtn');
+      const suggestBtn = document.getElementById('suggestBtn');
+
+      if (gameState.activeSuggestion) {
+        statusDiv.innerHTML = `🔍 Chiamata di <strong>${gameState.activeSuggestion.callerName}</strong> in verifica...`;
+        diceBtn.disabled = true;
+        suggestBtn.disabled = true;
+        return;
+      }
 
       if (isMyTurn) {
+        suggestBtn.disabled = false;
         if (gameState.stepsLeft > 0) {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca casella adiacente)`;
+          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (o formula un'ipotesi)`;
           diceBtn.disabled = true;
         } else {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Tira il dado per iniziare.`;
+          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Tira il dado o fai una chiamata.`;
           diceBtn.disabled = false;
         }
       } else {
@@ -498,6 +685,7 @@
         strong.appendChild(activeNameSafe);
         statusDiv.appendChild(strong);
         diceBtn.disabled = true;
+        suggestBtn.disabled = true;
       }
     }
 
@@ -529,6 +717,100 @@
           ctx.fillText('IO', p.x * TILE + TILE / 2, p.y * TILE + TILE / 1.5);
         }
       });
+    }
+
+    // --- TACCUINO & CARTE ---
+    function openModal(id) {
+      document.getElementById(id).style.display = 'flex';
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function showCustomAlert(msg) {
+      document.getElementById('custom-alert-msg').textContent = msg;
+      openModal('custom-alert-modal');
+    }
+
+    function renderMyCards() {
+      const container = document.getElementById('my-cards-container');
+      container.innerHTML = '';
+
+      if (myCards.length === 0) {
+        container.innerHTML = '<div style="color: #94a3b8; font-size: 13px;">Nessuna carta assegnata.</div>';
+        return;
+      }
+
+      myCards.forEach(card => {
+        const div = document.createElement('div');
+        div.className = 'card-pill';
+        div.textContent = card;
+        container.appendChild(div);
+      });
+    }
+
+    function initNotebook() {
+      ['suspects', 'weapons', 'rooms'].forEach(cat => {
+        ALL_CARDS[cat].forEach(item => {
+          if (!notebookState[item]) {
+            notebookState[item] = myCards.includes(item) ? 'yes' : 'none';
+          }
+        });
+      });
+      renderNotebookSection('suspects-notebook', ALL_CARDS.suspects);
+      renderNotebookSection('weapons-notebook', ALL_CARDS.weapons);
+      renderNotebookSection('rooms-notebook', ALL_CARDS.rooms);
+    }
+
+    function renderNotebookSection(containerId, list) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+
+      list.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'sheet-row';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = item;
+        nameSpan.style.fontSize = '13px';
+
+        const statusBtn = document.createElement('button');
+        statusBtn.className = 'sheet-status-btn';
+        updateStatusBtn(statusBtn, notebookState[item]);
+
+        statusBtn.onclick = () => {
+          cycleStatus(item, statusBtn);
+        };
+
+        row.appendChild(nameSpan);
+        row.appendChild(statusBtn);
+        container.appendChild(row);
+      });
+    }
+
+    function cycleStatus(item, btn) {
+      const order = ['none', 'no', 'yes', 'maybe'];
+      const nextIdx = (order.indexOf(notebookState[item]) + 1) % order.length;
+      notebookState[item] = order[nextIdx];
+      updateStatusBtn(btn, notebookState[item]);
+    }
+
+    function updateStatusBtn(btn, status) {
+      btn.className = 'sheet-status-btn';
+      if (status === 'none') {
+        btn.textContent = '·';
+        btn.classList.add('status-none');
+      } else if (status === 'no') {
+        btn.textContent = '✕';
+        btn.classList.add('status-no');
+      } else if (status === 'yes') {
+        btn.textContent = '✓';
+        btn.classList.add('status-yes');
+      } else if (status === 'maybe') {
+        btn.textContent = '?';
+        btn.classList.add('status-maybe');
+      }
     }
   </script>
 </body>
