@@ -1,392 +1,141 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Cluedo P2P WebRTC</title>
-  <!-- Libreria CDN stabile per la connessione PeerJS -->
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <style>
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-      touch-action: manipulation; 
-    }
-    body { 
-      background: #0f172a; 
-      color: #f8fafc; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      min-height: 100vh; 
-      padding: 14px; 
-    }
-    
-    .panel { 
-      background: #1e293b; 
-      padding: 18px; 
-      border-radius: 12px; 
-      width: 100%; 
-      max-width: 360px; 
-      margin-top: 20px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 12px; 
-      border: 1px solid #334155; 
-      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-    }
-    
-    input, button { 
-      padding: 12px 14px; 
-      border-radius: 8px; 
-      border: none; 
-      font-size: 15px; 
-      width: 100%; 
-    }
-    input { 
-      background: #0f172a; 
-      color: #fff; 
-      border: 1px solid #475569; 
-    }
-    input:focus {
-      outline: 2px solid #f59e0b;
-    }
-    
-    button { 
-      background: #f59e0b; 
-      color: #000; 
-      font-weight: 700; 
-      cursor: pointer; 
-      transition: opacity 0.2s;
-    }
-    button:active { 
-      opacity: 0.85; 
-    }
-    button:disabled { 
-      background: #475569; 
-      color: #94a3b8; 
-      cursor: not-allowed; 
-    }
+.panel { 
+  background: #1e293b; 
+  padding: 20px; 
+  border-radius: 12px; 
+  width: 100%; 
+  max-width: 380px; 
+  margin-top: 20px; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 12px; 
+  border: 1px solid #334155; 
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
 
-    #host-code-display { 
-      display: none; 
-      word-break: break-all; 
-      background: #0f172a; 
-      padding: 12px; 
-      border-radius: 8px; 
-      font-size: 13px; 
-      border: 1px dashed #f59e0b; 
-      line-height: 1.4;
-      text-align: center;
-    }
+input, button { 
+  padding: 12px 14px; 
+  border-radius: 8px; 
+  border: none; 
+  font-size: 15px; 
+  width: 100%; 
+}
+input { 
+  background: #0f172a; 
+  color: #fff; 
+  border: 1px solid #475569; 
+}
+input:focus {
+  outline: 2px solid #f59e0b;
+}
 
-    #game-container { 
-      display: none; 
-      flex-direction: column; 
-      align-items: center; 
-      width: 100%; 
-      max-width: 400px; 
-      gap: 12px; 
-      margin-top: 10px; 
-    }
-    
-    #status { 
-      width: 100%; 
-      background: #1e293b; 
-      padding: 12px; 
-      border-radius: 8px; 
-      font-size: 14px; 
-      text-align: center; 
-      border-left: 4px solid #f59e0b; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    
-    canvas { 
-      background: #020617; 
-      border: 2px solid #334155; 
-      border-radius: 8px; 
-      box-shadow: 0 6px 18px rgba(0,0,0,0.5); 
-    }
-  </style>
-</head>
-<body>
+button { 
+  background: #f59e0b; 
+  color: #000; 
+  font-weight: 700; 
+  cursor: pointer; 
+  transition: opacity 0.2s;
+}
+button:active { 
+  opacity: 0.85; 
+}
+button:disabled { 
+  background: #475569; 
+  color: #94a3b8; 
+  cursor: not-allowed; 
+}
 
-  <!-- SCHERMATA LOBBY INIZIALE -->
-  <div id="lobby" class="panel">
-    <h3 style="color: #f59e0b; text-align: center; letter-spacing: 1px;">CLUEDO P2P</h3>
-    <input type="text" id="username" placeholder="Inserisci il tuo nome">
-    
-    <div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
-      <button onclick="createGame()">CREA STANZA (FA DA HOST)</button>
-      
-      <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
-      
-      <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
-      <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
-    </div>
-    
-    <div id="host-code-display"></div>
-  </div>
+/* Stile Sala d'Attesa */
+.room-header {
+  background: #0f172a;
+  border: 1px dashed #f59e0b;
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.room-code-tag {
+  font-size: 18px;
+  font-weight: 800;
+  color: #f59e0b;
+  user-select: all;
+  word-break: break-all;
+  margin: 6px 0;
+  letter-spacing: 0.5px;
+}
+.player-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.player-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f172a;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  font-size: 14px;
+}
+.color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  flex-shrink: 0;
+}
 
-  <!-- AREA DI GIOCO -->
-  <div id="game-container">
-    <div id="status">In attesa di altri giocatori...</div>
-    <canvas id="board"></canvas>
-    <button id="diceBtn" onclick="rollDice()" disabled>TIRA IL DADO</button>
-  </div>
+/* Schermata Tabellone */
+#game-container { 
+  display: none; 
+  flex-direction: column; 
+  align-items: center; 
+  width: 100%; 
+  max-width: 400px; 
+  gap: 12px; 
+  margin-top: 10px; 
+}
+#status { 
+  width: 100%; 
+  background: #1e293b; 
+  padding: 12px; 
+  border-radius: 8px; 
+  font-size: 14px; 
+  text-align: center; 
+  border-left: 4px solid #f59e0b; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+canvas { 
+  background: #020617; 
+  border: 2px solid #334155; 
+  border-radius: 8px; 
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5); 
+}
 
-  <script>
-    let peer = null;
-    let isHost = false;
-    let connections = [];
-    let hostConn = null;
-    let myId = null;
-    let myName = '';
-    
-    let gameState = {
-      players: [],
-      turnIndex: 0,
-      stepsLeft: 0
-    };
 
-    const TILE = 30;
-    const GRID_SIZE = 10;
-    const canvas = document.getElementById('board');
-    const ctx = canvas.getContext('2d');
-    canvas.width = GRID_SIZE * TILE;
-    canvas.height = GRID_SIZE * TILE;
+<div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
+  <button onclick="createGame()">CREA STANZA (HOST)</button>
+  
+  <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
+  
+  <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
+  <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
+</div>
 
-    const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-    // 1. CREAZIONE STANZA (HOST)
-    function createGame() {
-      myName = document.getElementById('username').value.trim() || 'Host';
-      isHost = true;
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+  <span style="font-weight: 600; font-size: 14px;">Giocatori connessi:</span>
+  <span id="player-count" style="font-size: 13px; color: #f59e0b;">0/6</span>
+</div>
 
-      const codeBox = document.getElementById('host-code-display');
-      codeBox.style.display = 'block';
-      codeBox.innerHTML = 'Connessione al server di rete in corso...';
+<ul class="player-list" id="player-list-ul">
+  <!-- Elementi aggiunti dinamicamente -->
+</ul>
 
-      try {
-        peer = new Peer();
-      } catch (err) {
-        codeBox.innerHTML = '<span style="color:#ef4444;">Errore: per usare WebRTC devi caricare il file su un sito online (es. Netlify o GitHub), non aprirlo come file locale.</span>';
-        return;
-      }
-
-      peer.on('open', (id) => {
-        myId = id;
-        codeBox.innerHTML = `Codice stanza:<br><strong style="font-size:16px; color:#f59e0b; user-select:all;">${id}</strong><br><span style="font-size:11px; color:#94a3b8;">Copia e invia questo codice ai tuoi amici</span>`;
-        
-        gameState.players = [{ id: myId, name: myName, color: COLORS[0], x: 0, y: 0 }];
-        showGameView();
-        updateUI();
-      });
-
-      peer.on('error', (err) => {
-        console.error('Errore PeerJS:', err);
-        codeBox.innerHTML = `<span style="color:#ef4444;">Errore di connessione: ${err.type}</span>`;
-      });
-
-      peer.on('connection', (conn) => {
-        connections.push(conn);
-
-        conn.on('data', (data) => {
-          handleIncomingMessageAsHost(data, conn);
-        });
-
-        conn.on('close', () => {
-          gameState.players = gameState.players.filter(p => p.id !== conn.peer);
-          broadcastState();
-        });
-      });
-    }
-
-    // 2. ACCESSO ALLA STANZA (OSPITE)
-    function joinGame() {
-      myName = document.getElementById('username').value.trim() || 'Ospite';
-      const targetHostId = document.getElementById('joinId').value.trim();
-      if (!targetHostId) return alert('Incolla il codice stanza ricevuto da chi ha creato la partita');
-
-      isHost = false;
-      peer = new Peer();
-
-      peer.on('open', (id) => {
-        myId = id;
-        hostConn = peer.connect(targetHostId);
-
-        hostConn.on('open', () => {
-          showGameView();
-          hostConn.send({ type: 'JOIN', name: myName });
-        });
-
-        hostConn.on('data', (data) => {
-          if (data.type === 'SYNC') {
-            gameState = data.state;
-            updateUI();
-          }
-        });
-
-        hostConn.on('error', (err) => {
-          alert('Impossibile collegarsi alla stanza. Verifica il codice.');
-        });
-      });
-
-      peer.on('error', (err) => {
-        alert('Errore di connessione Peer: ' + err.type);
-      });
-    }
-
-    // 3. LOGICA DI GIOCO SUL TELEFONO DELL'HOST
-    function handleIncomingMessageAsHost(data, conn) {
-      if (data.type === 'JOIN') {
-        const pIndex = gameState.players.length;
-        const color = COLORS[pIndex % COLORS.length];
-        const spawns = [{x: 0, y: 0}, {x: 9, y: 0}, {x: 0, y: 9}, {x: 9, y: 9}];
-        const spawn = spawns[pIndex % spawns.length];
-
-        gameState.players.push({
-          id: conn.peer,
-          name: data.name,
-          color: color,
-          x: spawn.x,
-          y: spawn.y
-        });
-        broadcastState();
-      }
-
-      if (data.type === 'ACTION_ROLL') {
-        if (gameState.players[gameState.turnIndex].id === conn.peer && gameState.stepsLeft === 0) {
-          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
-          broadcastState();
-        }
-      }
-
-      if (data.type === 'ACTION_MOVE') {
-        executeMove(conn.peer, data.x, data.y);
-      }
-    }
-
-    function executeMove(playerId, targetX, targetY) {
-      const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0) return;
-
-      const dx = Math.abs(activePlayer.x - targetX);
-      const dy = Math.abs(activePlayer.y - targetY);
-
-      // Movimento ortogonale di 1 casella alla volta
-      if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-        activePlayer.x = targetX;
-        activePlayer.y = targetY;
-        gameState.stepsLeft--;
-
-        if (gameState.stepsLeft === 0) {
-          gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-        }
-
-        if (isHost) broadcastState();
-      }
-    }
-
-    function broadcastState() {
-      connections.forEach(conn => {
-        if (conn.open) conn.send({ type: 'SYNC', state: gameState });
-      });
-      updateUI();
-    }
-
-    // 4. AZIONI LOCALI
-    function rollDice() {
-      if (isHost) {
-        if (gameState.players[gameState.turnIndex].id === myId && gameState.stepsLeft === 0) {
-          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
-          broadcastState();
-        }
-      } else {
-        hostConn.send({ type: 'ACTION_ROLL' });
-      }
-    }
-
-    canvas.addEventListener('pointerdown', (e) => {
-      const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-
-      const x = Math.floor(((e.clientX - rect.left) * scaleX) / TILE);
-      const y = Math.floor(((e.clientY - rect.top) * scaleY) / TILE);
-
-      if (isHost) {
-        executeMove(myId, x, y);
-      } else {
-        hostConn.send({ type: 'ACTION_MOVE', x, y });
-      }
-    });
-
-    // 5. INTERFACCIA E DISEGNO CANVAS
-    function showGameView() {
-      document.getElementById('lobby').style.display = 'none';
-      document.getElementById('game-container').style.display = 'flex';
-    }
-
-    function updateUI() {
-      draw();
-      const activePlayer = gameState.players[gameState.turnIndex];
-      if (!activePlayer) return;
-
-      const isMyTurn = (activePlayer.id === myId);
-      const statusDiv = document.getElementById('status');
-      const diceBtn = document.getElementById('diceBtn');
-
-      if (isMyTurn) {
-        if (gameState.stepsLeft > 0) {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca una casella vicina)`;
-          diceBtn.disabled = true;
-        } else {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Tira il dado per iniziare.`;
-          diceBtn.disabled = false;
-        }
-      } else {
-        statusDiv.innerHTML = `Turno di: <strong>${activePlayer.name}</strong>`;
-        diceBtn.disabled = true;
-      }
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Sfondo e griglia
-      for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
-          ctx.fillStyle = '#1e293b';
-          ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-          ctx.strokeStyle = '#334155';
-          ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
-        }
-      }
-
-      // Giocatori
-      gameState.players.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE / 3, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-
-        if (p.id === myId) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '10px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('IO', p.x * TILE + TILE / 2, p.y * TILE + TILE / 1.5);
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+<div id="host-start-container" style="display: none; margin-top: 8px;">
+  <button onclick="startGame()" style="background: #10b981; color: #000;">AVVIA PARTITA</button>
+</div>
+<div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; padding: 6px;">
+  In attesa che l'Host avvii la partita...
+</div>
