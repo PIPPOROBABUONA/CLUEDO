@@ -1,150 +1,535 @@
-.panel { 
-  background: #1e293b; 
-  padding: 20px; 
-  border-radius: 12px; 
-  width: 100%; 
-  max-width: 380px; 
-  margin-top: 20px; 
-  display: flex; 
-  flex-direction: column; 
-  gap: 12px; 
-  border: 1px solid #334155; 
-  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cluedo P2P WebRTC</title>
+  <!-- Libreria CDN ufficiale PeerJS -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      touch-action: manipulation; 
+    }
+    body { 
+      background: #0f172a; 
+      color: #f8fafc; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 14px; 
+    }
+    
+    .panel { 
+      background: #1e293b; 
+      padding: 20px; 
+      border-radius: 12px; 
+      width: 100%; 
+      max-width: 380px; 
+      margin-top: 20px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+      border: 1px solid #334155; 
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+    
+    input, button { 
+      padding: 12px 14px; 
+      border-radius: 8px; 
+      border: none; 
+      font-size: 15px; 
+      width: 100%; 
+    }
+    input { 
+      background: #0f172a; 
+      color: #fff; 
+      border: 1px solid #475569; 
+    }
+    input:focus {
+      outline: 2px solid #f59e0b;
+    }
+    
+    button { 
+      background: #f59e0b; 
+      color: #000; 
+      font-weight: 700; 
+      cursor: pointer; 
+      transition: opacity 0.2s;
+    }
+    button:active { 
+      opacity: 0.85; 
+    }
+    button:disabled { 
+      background: #475569; 
+      color: #94a3b8; 
+      cursor: not-allowed; 
+    }
 
-input, button { 
-  padding: 12px 14px; 
-  border-radius: 8px; 
-  border: none; 
-  font-size: 15px; 
-  width: 100%; 
-}
-input { 
-  background: #0f172a; 
-  color: #fff; 
-  border: 1px solid #475569; 
-}
-input:focus {
-  outline: 2px solid #f59e0b;
-}
+    /* Stile Sala d'Attesa */
+    .room-header {
+      background: #0f172a;
+      border: 1px dashed #f59e0b;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .room-code-tag {
+      font-size: 17px;
+      font-weight: 800;
+      color: #f59e0b;
+      user-select: all;
+      word-break: break-all;
+      margin: 8px 0;
+      letter-spacing: 0.5px;
+    }
+    .copy-btn {
+      background: #334155;
+      color: #f8fafc;
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .player-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 10px 0;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0f172a;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      font-size: 14px;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      flex-shrink: 0;
+    }
 
-button { 
-  background: #f59e0b; 
-  color: #000; 
-  font-weight: 700; 
-  cursor: pointer; 
-  transition: opacity 0.2s;
-}
-button:active { 
-  opacity: 0.85; 
-}
-button:disabled { 
-  background: #475569; 
-  color: #94a3b8; 
-  cursor: not-allowed; 
-}
+    /* Schermata Tabellone */
+    #game-container { 
+      display: none; 
+      flex-direction: column; 
+      align-items: center; 
+      width: 100%; 
+      max-width: 400px; 
+      gap: 12px; 
+      margin-top: 10px; 
+    }
+    #status { 
+      width: 100%; 
+      background: #1e293b; 
+      padding: 12px; 
+      border-radius: 8px; 
+      font-size: 14px; 
+      text-align: center; 
+      border-left: 4px solid #f59e0b; 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    canvas { 
+      background: #020617; 
+      border: 2px solid #334155; 
+      border-radius: 8px; 
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5); 
+    }
+  </style>
+</head>
+<body>
 
-/* Stile Sala d'Attesa */
-.room-header {
-  background: #0f172a;
-  border: 1px dashed #f59e0b;
-  border-radius: 10px;
-  padding: 14px;
-  text-align: center;
-}
-.room-code-tag {
-  font-size: 17px;
-  font-weight: 800;
-  color: #f59e0b;
-  user-select: all;
-  word-break: break-all;
-  margin: 8px 0;
-  letter-spacing: 0.5px;
-}
-.copy-btn {
-  background: #334155;
-  color: #f8fafc;
-  font-size: 13px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-weight: 600;
-  margin-top: 4px;
-}
-.player-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 10px 0;
-  max-height: 220px;
-  overflow-y: auto;
-}
-.player-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #0f172a;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #334155;
-  font-size: 14px;
-}
-.color-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-  flex-shrink: 0;
-}
+  <!-- 1. LOBBY INIZIALE -->
+  <div id="lobby-screen" class="panel">
+    <h3 style="color: #f59e0b; text-align: center; letter-spacing: 1px;">CLUEDO P2P</h3>
+    <input type="text" id="username" placeholder="Inserisci il tuo nome">
+    
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
+      <button onclick="createGame()">CREA STANZA (HOST)</button>
+      
+      <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
+      
+      <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
+      <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
+    </div>
+  </div>
 
-/* Schermata Tabellone */
-#game-container { 
-  display: none; 
-  flex-direction: column; 
-  align-items: center; 
-  width: 100%; 
-  max-width: 400px; 
-  gap: 12px; 
-  margin-top: 10px; 
-}
-#status { 
-  width: 100%; 
-  background: #1e293b; 
-  padding: 12px; 
-  border-radius: 8px; 
-  font-size: 14px; 
-  text-align: center; 
-  border-left: 4px solid #f59e0b; 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-canvas { 
-  background: #020617; 
-  border: 2px solid #334155; 
-  border-radius: 8px; 
-  box-shadow: 0 6px 18px rgba(0,0,0,0.5); 
-}
+  <!-- 2. SALA D'ATTESA (WAITING ROOM) -->
+  <div id="waiting-screen" class="panel" style="display: none;">
+    <div class="room-header">
+      <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase;">Codice Stanza</div>
+      <div class="room-code-tag" id="display-room-code">GENERAZIONE...</div>
+      <button class="copy-btn" onclick="copyRoomCode()">Copia Codice</button>
+    </div>
 
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+      <span style="font-weight: 600; font-size: 14px;">Giocatori connessi:</span>
+      <span id="player-count" style="font-size: 13px; color: #f59e0b;">0/6</span>
+    </div>
 
-<div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
-  <button onclick="createGame()">CREA STANZA (HOST)</button>
-  
-  <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
-  
-  <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
-  <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
-</div>
+    <ul class="player-list" id="player-list-ul"></ul>
 
+    <div id="host-start-container" style="display: none; margin-top: 8px;">
+      <button onclick="startGame()" style="background: #10b981; color: #000;">AVVIA PARTITA</button>
+    </div>
+    <div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; padding: 6px;">
+      In attesa che l'Host avvii la partita...
+    </div>
+  </div>
 
-<div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
-  <span style="font-weight: 600; font-size: 14px;">Giocatori connessi:</span>
-  <span id="player-count" style="font-size: 13px; color: #f59e0b;">0/6</span>
-</div>
+  <!-- 3. AREA DI GIOCO -->
+  <div id="game-container">
+    <div id="status">In attesa dell'inizio...</div>
+    <canvas id="board"></canvas>
+    <button id="diceBtn" onclick="rollDice()" disabled>TIRA IL DADO</button>
+  </div>
 
-<ul class="player-list" id="player-list-ul"></ul>
+  <script>
+    let peer = null;
+    let isHost = false;
+    let connections = [];
+    let hostConn = null;
+    let myId = null;
+    let myName = '';
+    
+    let gameState = {
+      started: false,
+      players: [],
+      turnIndex: 0,
+      stepsLeft: 0
+    };
 
-<div id="host-start-container" style="display: none; margin-top: 8px;">
-  <button onclick="startGame()" style="background: #10b981; color: #000;">AVVIA PARTITA</button>
-</div>
-<div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; padding: 6px;">
-  In attesa che l'Host avvii la partita...
-</div>
+    const TILE = 30;
+    const GRID_SIZE = 10;
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    canvas.width = GRID_SIZE * TILE;
+    canvas.height = GRID_SIZE * TILE;
+
+    const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+    // Opzioni PeerJS con server STUN ufficiali di Google per l'attraversamento NAT mobile
+    const PEER_CONFIG = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    };
+
+    // 1. CREAZIONE STANZA (HOST)
+    function createGame() {
+      myName = document.getElementById('username').value.trim() || 'Host';
+      isHost = true;
+
+      showWaitingScreen();
+      document.getElementById('display-room-code').textContent = 'Creazione in corso...';
+      document.getElementById('host-start-container').style.display = 'block';
+
+      try {
+        peer = new Peer(PEER_CONFIG);
+      } catch (err) {
+        alert('Errore PeerJS. Assicurati di eseguire il file tramite HTTPS o server locale.');
+        return;
+      }
+
+      peer.on('open', (id) => {
+        myId = id;
+        document.getElementById('display-room-code').textContent = id;
+        
+        gameState.players = [{ id: myId, name: myName, color: COLORS[0], x: 0, y: 0, isHost: true }];
+        updateWaitingRoomUI();
+      });
+
+      peer.on('error', (err) => {
+        console.error('Errore PeerJS:', err);
+        alert('Errore di connessione: ' + err.type);
+      });
+
+      peer.on('connection', (conn) => {
+        connections.push(conn);
+
+        conn.on('data', (data) => {
+          handleIncomingMessageAsHost(data, conn);
+        });
+
+        conn.on('close', () => {
+          gameState.players = gameState.players.filter(p => p.id !== conn.peer);
+          connections = connections.filter(c => c !== conn);
+          broadcastState();
+          updateWaitingRoomUI();
+        });
+      });
+    }
+
+    // 2. ACCESSO ALLA STANZA (CLIENT)
+    function joinGame() {
+      myName = document.getElementById('username').value.trim() || 'Ospite';
+      const targetHostId = document.getElementById('joinId').value.trim();
+      if (!targetHostId) return alert('Incolla il codice stanza generato dall\'Host');
+
+      isHost = false;
+      showWaitingScreen();
+      document.getElementById('display-room-code').textContent = targetHostId;
+      document.getElementById('client-waiting-msg').style.display = 'block';
+
+      peer = new Peer(PEER_CONFIG);
+
+      peer.on('open', (id) => {
+        myId = id;
+        hostConn = peer.connect(targetHostId);
+
+        hostConn.on('open', () => {
+          hostConn.send({ type: 'JOIN', name: myName });
+        });
+
+        hostConn.on('data', (data) => {
+          if (data.type === 'SYNC') {
+            gameState = data.state;
+            if (gameState.started) {
+              showGameView();
+              updateUI();
+            } else {
+              updateWaitingRoomUI();
+            }
+          }
+        });
+
+        hostConn.on('error', (err) => {
+          alert('Impossibile collegarsi alla stanza. Verifica il codice.');
+        });
+      });
+
+      peer.on('error', (err) => {
+        alert('Errore Peer: ' + err.type);
+      });
+    }
+
+    // 3. LOGICA DI GIOCO SUL TELEFONO DELL'HOST
+    function handleIncomingMessageAsHost(data, conn) {
+      if (data.type === 'JOIN') {
+        const pIndex = gameState.players.length;
+        const color = COLORS[pIndex % COLORS.length];
+        const spawns = [{x: 0, y: 0}, {x: 9, y: 0}, {x: 0, y: 9}, {x: 9, y: 9}, {x: 4, y: 0}, {x: 4, y: 9}];
+        const spawn = spawns[pIndex % spawns.length];
+
+        gameState.players.push({
+          id: conn.peer,
+          name: data.name,
+          color: color,
+          x: spawn.x,
+          y: spawn.y,
+          isHost: false
+        });
+
+        broadcastState();
+        updateWaitingRoomUI();
+      }
+
+      if (data.type === 'ACTION_ROLL') {
+        if (gameState.players[gameState.turnIndex].id === conn.peer && gameState.stepsLeft === 0) {
+          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
+          broadcastState();
+        }
+      }
+
+      if (data.type === 'ACTION_MOVE') {
+        executeMove(conn.peer, data.x, data.y);
+      }
+    }
+
+    function startGame() {
+      if (!isHost) return;
+      if (gameState.players.length < 1) return alert('Attendi almeno un giocatore');
+
+      gameState.started = true;
+      broadcastState();
+      showGameView();
+      updateUI();
+    }
+
+    function executeMove(playerId, targetX, targetY) {
+      const activePlayer = gameState.players[gameState.turnIndex];
+      if (!activePlayer || activePlayer.id !== playerId || gameState.stepsLeft <= 0) return;
+
+      const dx = Math.abs(activePlayer.x - targetX);
+      const dy = Math.abs(activePlayer.y - targetY);
+
+      if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+        activePlayer.x = targetX;
+        activePlayer.y = targetY;
+        gameState.stepsLeft--;
+
+        if (gameState.stepsLeft === 0) {
+          gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+        }
+
+        if (isHost) broadcastState();
+      }
+    }
+
+    function broadcastState() {
+      connections.forEach(conn => {
+        if (conn.open) conn.send({ type: 'SYNC', state: gameState });
+      });
+      if (gameState.started) updateUI();
+    }
+
+    function rollDice() {
+      if (isHost) {
+        if (gameState.players[gameState.turnIndex].id === myId && gameState.stepsLeft === 0) {
+          gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
+          broadcastState();
+        }
+      } else {
+        hostConn.send({ type: 'ACTION_ROLL' });
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const activePlayer = gameState.players[gameState.turnIndex];
+      if (!activePlayer || activePlayer.id !== myId || gameState.stepsLeft <= 0) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / TILE);
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / TILE);
+
+      if (isHost) {
+        executeMove(myId, x, y);
+      } else {
+        hostConn.send({ type: 'ACTION_MOVE', x, y });
+      }
+    });
+
+    // 4. GESTIONE SCHERMATE E INTERFACCIA
+    function showWaitingScreen() {
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('waiting-screen').style.display = 'flex';
+      document.getElementById('game-container').style.display = 'none';
+    }
+
+    function showGameView() {
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('waiting-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'flex';
+    }
+
+    function updateWaitingRoomUI() {
+      const listUl = document.getElementById('player-list-ul');
+      const countSpan = document.getElementById('player-count');
+      listUl.innerHTML = '';
+
+      countSpan.textContent = `${gameState.players.length}/6`;
+
+      gameState.players.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'player-item';
+
+        const dot = document.createElement('span');
+        dot.className = 'color-dot';
+        dot.style.background = p.color;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = p.name + (p.id === myId ? ' (Tu)' : '');
+
+        li.appendChild(dot);
+        li.appendChild(nameSpan);
+
+        if (p.isHost) {
+          const hostBadge = document.createElement('span');
+          hostBadge.textContent = 'HOST';
+          hostBadge.style.cssText = 'font-size: 10px; background: #f59e0b; color: #000; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: auto;';
+          li.appendChild(hostBadge);
+        }
+
+        listUl.appendChild(li);
+      });
+    }
+
+    function copyRoomCode() {
+      const code = document.getElementById('display-room-code').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('Codice stanza copiato negli appunti!');
+      }).catch(() => {
+        prompt('Copia manualmente il codice:', code);
+      });
+    }
+
+    function updateUI() {
+      draw();
+      const activePlayer = gameState.players[gameState.turnIndex];
+      if (!activePlayer) return;
+
+      const isMyTurn = (activePlayer.id === myId);
+      const statusDiv = document.getElementById('status');
+      const diceBtn = document.getElementById('diceBtn');
+
+      if (isMyTurn) {
+        if (gameState.stepsLeft > 0) {
+          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca casella adiacente)`;
+          diceBtn.disabled = true;
+        } else {
+          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Tira il dado per iniziare.`;
+          diceBtn.disabled = false;
+        }
+      } else {
+        const activeNameSafe = document.createElement('span');
+        activeNameSafe.textContent = activePlayer.name;
+        statusDiv.innerHTML = 'Turno di: ';
+        const strong = document.createElement('strong');
+        strong.appendChild(activeNameSafe);
+        statusDiv.appendChild(strong);
+        diceBtn.disabled = true;
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+          ctx.strokeStyle = '#334155';
+          ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
+        }
+      }
+
+      gameState.players.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE / 3, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        if (p.id === myId) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('IO', p.x * TILE + TILE / 2, p.y * TILE + TILE / 1.5);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
