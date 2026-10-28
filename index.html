@@ -1,36 +1,310 @@
-<!-- ... existing code ... -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cluedo P2P Detective</title>
+  <!-- PeerJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+      touch-action: manipulation; 
+    }
+    body { 
+      background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%); 
+      color: #f8fafc; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 12px;
+      overflow-x: hidden;
+    }
+    
+    /* Pannelli principali */
+    .panel { 
+      background: rgba(30, 41, 59, 0.9); 
+      backdrop-filter: blur(10px);
+      padding: 20px; 
+      border-radius: 16px; 
+      width: 100%; 
+      max-width: 380px; 
+      margin-top: 14px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+    
+    input, select, button { 
+      padding: 12px 14px; 
+      border-radius: 10px; 
+      border: none; 
+      font-size: 15px; 
+      width: 100%; 
+      transition: all 0.2s ease;
+    }
+    input, select { 
+      background: #0f172a; 
+      color: #fff; 
+      border: 1px solid #334155; 
+    }
+    input:focus, select:focus {
+      outline: 2px solid #f59e0b;
+      border-color: transparent;
+    }
+    
+    button { 
+      background: #f59e0b; 
+      color: #0f172a; 
+      font-weight: 700; 
+      cursor: pointer; 
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    }
+    button:active { 
+      transform: scale(0.98);
+      filter: brightness(0.92); 
+    }
+    button:disabled { 
+      background: #334155 !important; 
+      color: #64748b !important; 
+      cursor: not-allowed; 
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* Sala d'attesa */
+    .room-header { 
+      background: #0b1120; 
+      border: 1px dashed #f59e0b; 
+      border-radius: 12px; 
+      padding: 14px; 
+      text-align: center; 
+    }
+    .room-code-tag { 
+      font-size: 17px; 
+      font-weight: 800; 
+      color: #f59e0b; 
+      user-select: all; 
+      word-break: break-all; 
+      margin: 6px 0; 
+      letter-spacing: 0.5px; 
+    }
+    .player-list { 
+      list-style: none; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 8px; 
+      margin: 6px 0; 
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .player-item { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      background: #0f172a; 
+      padding: 10px 14px; 
+      border-radius: 10px; 
+      border: 1px solid #1e293b; 
+      font-size: 14px; 
+    }
+    .color-dot { 
+      width: 14px; 
+      height: 14px; 
+      border-radius: 50%; 
+      border: 2px solid #ffffff; 
+      flex-shrink: 0; 
+      box-shadow: 0 0 8px rgba(255,255,255,0.4);
+    }
+
+    /* Schermata di Gioco */
+    #game-container { 
+      display: none; 
+      flex-direction: column; 
+      align-items: center; 
+      width: 100%; 
+      max-width: 420px; 
+      gap: 10px; 
+      margin-top: 6px; 
+    }
+    
+    #status { 
+      width: 100%; 
+      background: #1e293b; 
+      padding: 12px; 
+      border-radius: 10px; 
+      font-size: 13px; 
+      text-align: center; 
+      border-left: 4px solid #f59e0b; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      line-height: 1.4;
+    }
+    
+    canvas { 
+      background: #020617; 
+      border: 2px solid #334155; 
+      border-radius: 12px; 
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6); 
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Modali */
+    .modal-overlay { 
+      position: fixed; 
+      top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(0,0,0,0.85); 
+      backdrop-filter: blur(4px);
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      z-index: 9999; 
+      padding: 14px; 
+    }
+    .modal-box { 
+      background: #1e293b; 
+      border-radius: 16px; 
+      padding: 18px; 
+      width: 100%; 
+      max-width: 380px; 
+      border: 1px solid #475569; 
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.7);
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 8px;
+    }
+    .close-btn { 
+      background: #334155; 
+      color: #94a3b8; 
+      border-radius: 50%; 
+      width: 32px; 
+      height: 32px; 
+      padding: 0; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      cursor: pointer; 
+      font-size: 16px; 
+    }
+
+    /* Badge & Cards */
+    .card-pill { 
+      background: #0f172a; 
+      border: 1px solid #38bdf8; 
+      padding: 10px 14px; 
+      border-radius: 8px; 
+      font-size: 13px; 
+      font-weight: 600; 
+      color: #e0f2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sheet-row { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      padding: 6px 0; 
+      border-bottom: 1px solid #334155; 
+    }
+    .sheet-status-btn { 
+      width: 38px; 
+      height: 32px; 
+      border-radius: 6px; 
+      font-weight: bold; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      padding: 0;
+      font-size: 14px;
+    }
+    .status-none { background: #334155; color: #94a3b8; }
+    .status-no { background: #ef4444; color: #ffffff; }
+    .status-yes { background: #10b981; color: #ffffff; }
+    .status-maybe { background: #f59e0b; color: #000000; }
+  </style>
+</head>
+<body>
+
   <!-- 1. LOBBY INIZIALE -->
   <div id="lobby-screen" class="panel">
-    <h3 style="color: #f59e0b; text-align: center; letter-spacing: 1px;">CLUEDO P2P</h3>
+    <div style="text-align:center;">
+      <h2 style="color: #f59e0b; letter-spacing: 1.5px; font-weight: 900;">CLUEDO ONLINE</h2>
+      <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Peer-to-Peer Detective Game</p>
+    </div>
+    
     <input type="text" id="username" placeholder="Inserisci il tuo nome">
     
-    <div style="display:flex; flex-direction:column; gap:8px; margin-top: 4px;">
-      <input type="text" id="hostPassword" placeholder="Password stanza (opzionale)">
-      <button onclick="createGame()">CREA STANZA (HOST)</button>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top: 4px;">
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px solid #334155;">
+        <span style="font-size: 12px; color: #f59e0b; font-weight: 700; text-transform: uppercase;">Opzione 1: Crea Stanza</span>
+        <input type="text" id="hostPassword" placeholder="Password stanza (opzionale)" style="margin-top: 6px;">
+        <button onclick="createGame()" style="margin-top: 8px;">CREA STANZA (HOST)</button>
+      </div>
       
-      <div style="text-align:center; font-size: 12px; color: #94a3b8; margin: 4px 0;">oppure</div>
+      <div style="text-align:center; font-size: 12px; color: #64748b; font-weight: bold;">OPPURE</div>
       
-      <input type="text" id="joinId" placeholder="Incolla codice stanza dell'Host">
-      <input type="password" id="joinPassword" placeholder="Password stanza (se richiesta)">
-      <button onclick="joinGame()" style="background: #3b82f6; color: #fff;">ENTRA NELLA STANZA</button>
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px solid #334155;">
+        <span style="font-size: 12px; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Opzione 2: Partecipa</span>
+        <input type="text" id="joinId" placeholder="Codice stanza dell'Host" style="margin-top: 6px;">
+        <input type="password" id="joinPassword" placeholder="Password (se richiesta)" style="margin-top: 6px;">
+        <button onclick="joinGame()" style="background: #3b82f6; color: #fff; margin-top: 8px;">ENTRA NELLA STANZA</button>
+      </div>
     </div>
   </div>
 
   <!-- 2. SALA D'ATTESA (WAITING ROOM) -->
-<!-- ... existing code ... -->
+  <div id="waiting-screen" class="panel" style="display: none;">
+    <div class="room-header">
+      <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Codice Stanza da condividere:</div>
+      <div id="display-room-code" class="room-code-tag">Generazione in corso...</div>
+      <button onclick="copyRoomCode()" style="background: #334155; color: #f59e0b; font-size: 12px; padding: 6px 12px; width: auto; margin-top: 4px;">📋 Copia Codice</button>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 6px;">
+      <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">Detective connessi:</span>
+      <span id="player-count" style="font-size: 12px; background: #0f172a; padding: 3px 8px; border-radius: 12px; color: #f59e0b;">1/6</span>
+    </div>
+
+    <ul id="player-list-ul" class="player-list"></ul>
+
+    <div id="host-start-container" style="display: none; margin-top: 6px;">
+      <button onclick="startGame()" style="background: #10b981; color: #0f172a; font-size: 16px; padding: 14px;">▶ AVVIA PARTITA</button>
+    </div>
+    <div id="client-waiting-msg" style="display: none; text-align: center; font-size: 13px; color: #94a3b8; font-style: italic;">
+      In attesa che l'Host avvii l'indagine...
+    </div>
+  </div>
+
   <!-- 3. AREA DI GIOCO -->
   <div id="game-container">
     <div id="status">In attesa dell'inizio...</div>
     <canvas id="board"></canvas>
+    
+    <!-- Azioni del Turno -->
     <div style="width: 100%; display: flex; gap: 8px;">
-      <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1;">TIRA IL DADO</button>
-      <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1; background: #8b5cf6; color: #fff;">FORMULA IPOTESI</button>
+      <button id="diceBtn" onclick="rollDice()" disabled style="flex: 1.2;">🎲 TIRA DADO</button>
+      <button id="suggestBtn" onclick="openSuggestModal()" disabled style="flex: 1.2; background: #8b5cf6; color: #fff;">🔍 IPOTESI</button>
+      <button id="endTurnBtn" onclick="passTurn()" disabled style="flex: 1; background: #475569; color: #fff; font-size: 12px;">PASSA</button>
     </div>
     
     <!-- Barra rapida schede e taccuino -->
-    <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
-      <button onclick="openModal('cards-modal')" style="background: #334155; color: #f8fafc; font-size: 13px; padding: 10px;">🎴 Le Mie Carte</button>
-      <button onclick="openModal('sheet-modal')" style="background: #334155; color: #f8fafc; font-size: 13px; padding: 10px;">📝 Taccuino</button>
+    <div style="display: flex; gap: 8px; width: 100%; margin-top: 2px;">
+      <button onclick="openModal('cards-modal')" style="background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; font-size: 13px; padding: 10px;">🎴 Le Mie Carte (<span id="my-cards-count">0</span>)</button>
+      <button onclick="openModal('sheet-modal')" style="background: #1e293b; color: #fbbf24; border: 1px solid #d97706; font-size: 13px; padding: 10px;">📝 Taccuino Indizi</button>
     </div>
   </div>
 
@@ -38,23 +312,23 @@
   <div id="suggest-modal" class="modal-overlay" style="display: none;">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="color: #a78bfa;">Formula Ipotesi (Chiamata)</h3>
+        <h3 style="color: #a78bfa; font-size: 16px;">Formula Ipotesi (Chiamata)</h3>
         <button class="close-btn" onclick="closeModal('suggest-modal')">&times;</button>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
         <div>
-          <label style="font-size: 12px; color: #94a3b8;">Sospettato:</label>
-          <select id="suggestSuspect" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Sospettato:</label>
+          <select id="suggestSuspect" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8;">Arma:</label>
-          <select id="suggestWeapon" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Arma:</label>
+          <select id="suggestWeapon" style="margin-top: 4px;"></select>
         </div>
         <div>
-          <label style="font-size: 12px; color: #94a3b8;">Stanza:</label>
-          <select id="suggestRoom" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; color: #fff; border: 1px solid #475569; margin-top: 4px;"></select>
+          <label style="font-size: 12px; color: #94a3b8; font-weight: bold;">Stanza:</label>
+          <select id="suggestRoom" style="margin-top: 4px;"></select>
         </div>
-        <button onclick="submitSuggestion()" style="background: #8b5cf6; color: #fff; margin-top: 8px; padding: 12px;">INVIA CHIAMATA</button>
+        <button onclick="submitSuggestion()" style="background: #8b5cf6; color: #fff; margin-top: 8px; padding: 12px;">INVIA IPOTESI AL TAVOLO</button>
       </div>
     </div>
   </div>
@@ -63,17 +337,57 @@
   <div id="disprove-modal" class="modal-overlay" style="display: none;">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="color: #f59e0b;">Chiamata in corso!</h3>
+        <h3 style="color: #f59e0b; font-size: 16px;">Sei stato interrogato!</h3>
       </div>
-      <div id="disprove-banner" style="background: #0f172a; border-left: 4px solid #8b5cf6; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
-      <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">Seleziona una carta da mostrare in segreto:</div>
+      <div id="disprove-banner" style="background: #0f172a; border-left: 4px solid #8b5cf6; padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Scegli quale carta mostrare in segreto:</div>
       <div id="disprove-cards-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
       <button id="disprove-none-btn" onclick="passDisprove()" style="background: #475569; color: #fff; margin-top: 12px; font-size: 13px; padding: 10px;">NON HO NESSUNA CARTA</button>
     </div>
   </div>
 
   <!-- MODALE LE MIE CARTE -->
-<!-- ... existing code ... -->
+  <div id="cards-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color: #38bdf8; font-size: 16px;">🎴 Le Mie Carte Segrete</h3>
+        <button class="close-btn" onclick="closeModal('cards-modal')">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Queste carte sono in tuo possesso e non sono nella busta del delitto:</p>
+      <div id="my-cards-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    </div>
+  </div>
+
+  <!-- MODALE TACCUINO -->
+  <div id="sheet-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color: #fbbf24; font-size: 16px;">📝 Taccuino del Detective</h3>
+        <button class="close-btn" onclick="closeModal('sheet-modal')">&times;</button>
+      </div>
+      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px; display: flex; gap: 8px; justify-content: center;">
+        <span>· Vuoto</span> <span>✕ Escluso</span> <span style="color:#10b981;">✓ Certo</span> <span style="color:#f59e0b;">? Dubbio</span>
+      </div>
+      
+      <div style="font-size: 13px; font-weight: 700; color: #a78bfa; margin: 8px 0 4px;">👤 SOSPETTATI</div>
+      <div id="suspects-notebook"></div>
+
+      <div style="font-size: 13px; font-weight: 700; color: #f87171; margin: 12px 0 4px;">🔪 ARMI</div>
+      <div id="weapons-notebook"></div>
+
+      <div style="font-size: 13px; font-weight: 700; color: #60a5fa; margin: 12px 0 4px;">🚪 STANZE</div>
+      <div id="rooms-notebook"></div>
+    </div>
+  </div>
+
+  <!-- MODALE ALERT PERSONALIZZATO -->
+  <div id="custom-alert-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: center;">
+      <div id="custom-alert-msg" style="font-size: 14px; line-height: 1.5; margin: 10px 0 16px; white-space: pre-line;"></div>
+      <button onclick="closeModal('custom-alert-modal')" style="background: #f59e0b; color: #000; font-weight: 700; padding: 10px;">HO CAPITO</button>
+    </div>
+  </div>
+
   <script>
     let peer = null;
     let isHost = false;
@@ -88,7 +402,7 @@
       players: [],
       turnIndex: 0,
       stepsLeft: 0,
-      activeSuggestion: null // Stato chiamata in corso
+      activeSuggestion: null
     };
 
     let myCards = [];
@@ -111,7 +425,7 @@
       ]
     };
 
-    const TILE = 30;
+    const TILE = 32;
     const GRID_SIZE = 10;
     const canvas = document.getElementById('board');
     const ctx = canvas.getContext('2d');
@@ -136,13 +450,13 @@
       isHost = true;
 
       showWaitingScreen();
-      document.getElementById('display-room-code').textContent = 'Creazione in corso...';
+      document.getElementById('display-room-code').textContent = 'Connessione al server di rete...';
       document.getElementById('host-start-container').style.display = 'block';
 
       try {
         peer = new Peer(PEER_CONFIG);
       } catch (err) {
-        showCustomAlert('Errore PeerJS. Esegui il file tramite HTTPS o server locale.');
+        showCustomAlert('Errore PeerJS. Assicurati di usare HTTPS o un server locale.');
         return;
       }
 
@@ -190,7 +504,7 @@
 
       peer.on('open', (id) => {
         myId = id;
-        hostConn = peer.connect(targetHostId);
+        hostConn = peer.connect(targetHostId, { reliable: true });
 
         hostConn.on('open', () => {
           hostConn.send({ type: 'JOIN', name: myName, password: enteredPass });
@@ -232,7 +546,7 @@
       });
 
       peer.on('error', (err) => {
-        showCustomAlert('Errore Peer: ' + err.type);
+        showCustomAlert('Errore di connessione: ' + err.type);
       });
     }
 
@@ -241,7 +555,7 @@
       if (data.type === 'JOIN') {
         if (roomPassword && data.password !== roomPassword) {
           conn.send({ type: 'AUTH_FAILED' });
-          setTimeout(() => conn.close(), 500);
+          setTimeout(() => conn.close(), 400);
           return;
         }
 
@@ -264,7 +578,8 @@
       }
 
       if (data.type === 'ACTION_ROLL') {
-        if (gameState.players[gameState.turnIndex].id === conn.peer && gameState.stepsLeft === 0 && !gameState.activeSuggestion) {
+        const active = gameState.players[gameState.turnIndex];
+        if (active && active.id === conn.peer && gameState.stepsLeft === 0 && !gameState.activeSuggestion) {
           gameState.stepsLeft = Math.floor(Math.random() * 6) + 1;
           broadcastState();
         }
@@ -272,6 +587,15 @@
 
       if (data.type === 'ACTION_MOVE') {
         executeMove(conn.peer, data.x, data.y);
+      }
+
+      if (data.type === 'ACTION_PASS_TURN') {
+        const active = gameState.players[gameState.turnIndex];
+        if (active && active.id === conn.peer && !gameState.activeSuggestion) {
+          gameState.stepsLeft = 0;
+          gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+          broadcastState();
+        }
       }
 
       if (data.type === 'START_SUGGESTION') {
@@ -285,7 +609,7 @@
 
     function startGame() {
       if (!isHost) return;
-      if (gameState.players.length < 1) return showCustomAlert('Attendi almeno un giocatore');
+      if (gameState.players.length < 1) return showCustomAlert('Attendi almeno un altro giocatore');
 
       distributeCardsAndSetCaseFile();
       gameState.started = true;
@@ -352,7 +676,6 @@
       const act = gameState.activeSuggestion;
       if (!act) return;
 
-      // Se il giro completo è finito e nessuno ha risposto
       if (act.currentRespondentIndex === act.startIndex) {
         sendToPlayer(act.callerId, {
           type: 'SUGGESTION_RESULT',
@@ -393,7 +716,6 @@
       const respondentName = respondent ? respondent.name : 'Un giocatore';
 
       if (hasCard && card) {
-        // Carta mostrata in privato ESCLUSIVAMENTE al chiamante
         sendToPlayer(act.callerId, {
           type: 'SUGGESTION_RESULT',
           callerId: act.callerId,
@@ -402,7 +724,6 @@
           responderName: respondentName
         });
 
-        // Agli altri si notifica che l'ipotesi è stata smentita senza mostrare la carta
         broadcastExceptCaller(act.callerId, {
           type: 'SUGGESTION_RESULT',
           callerId: act.callerId,
@@ -413,7 +734,6 @@
 
         endSuggestionTurn();
       } else {
-        // Il giocatore passa; si interroga il successivo a sinistra (senso orario)
         act.currentRespondentIndex = (act.currentRespondentIndex + 1) % gameState.players.length;
         askNextRespondent();
       }
@@ -451,18 +771,17 @@
         if (data.disproved) {
           showCustomAlert(`🕵️ ${data.responderName} ti ha mostrato in segreto la carta:\n👉 [ ${data.card} ]`);
         } else {
-          showCustomAlert(`🔍 Nessun giocatore ha potuto smentire la tua ipotesi! Nessuno possiede quelle 3 carte.`);
+          showCustomAlert(`🔍 Nessun giocatore ha potuto smentire la tua ipotesi!\nNessuno possiede quelle 3 carte.`);
         }
       } else {
         if (data.disproved) {
           showCustomAlert(`ℹ️ ${data.responderName} ha mostrato una carta segreta a chi ha fatto la chiamata.`);
         } else {
-          showCustomAlert(`ℹ️ Nessun giocatore ha potuto smentire l'ipotesi formulata.`);
+          showCustomAlert(`ℹ️ Nessun giocatore ha potuto smentire l'ipotesi.`);
         }
       }
     }
 
-    // --- INTERFACCIA CHIAMATA E RISPOSTA ---
     function openSuggestModal() {
       populateSuggestSelects();
       openModal('suggest-modal');
@@ -512,7 +831,7 @@
         matchedCards.forEach(card => {
           const btn = document.createElement('button');
           btn.textContent = `Mostra segretamente: ${card}`;
-          btn.style.cssText = 'background: #10b981; color: #000; font-weight: 700; padding: 12px; font-size: 14px;';
+          btn.style.cssText = 'background: #10b981; color: #022c22; font-weight: 700; padding: 12px; font-size: 14px;';
           btn.onclick = () => {
             closeModal('disprove-modal');
             sendDisproveChoice(card, true);
@@ -521,8 +840,8 @@
         });
       } else {
         const noMatchMsg = document.createElement('div');
-        noMatchMsg.textContent = 'Non hai nessuna delle carte richieste tra le tue.';
-        noMatchMsg.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic;';
+        noMatchMsg.textContent = 'Non possiedi nessuna delle tre carte richieste.';
+        noMatchMsg.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic; padding: 6px 0;';
         listDiv.appendChild(noMatchMsg);
       }
 
@@ -555,6 +874,19 @@
         gameState.stepsLeft--;
 
         if (isHost) broadcastState();
+      }
+    }
+
+    function passTurn() {
+      const activePlayer = gameState.players[gameState.turnIndex];
+      if (!activePlayer || activePlayer.id !== myId || gameState.activeSuggestion) return;
+
+      if (isHost) {
+        gameState.stepsLeft = 0;
+        gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+        broadcastState();
+      } else {
+        hostConn.send({ type: 'ACTION_PASS_TURN' });
       }
     }
 
@@ -660,32 +992,36 @@
       const statusDiv = document.getElementById('status');
       const diceBtn = document.getElementById('diceBtn');
       const suggestBtn = document.getElementById('suggestBtn');
+      const endTurnBtn = document.getElementById('endTurnBtn');
 
       if (gameState.activeSuggestion) {
         statusDiv.innerHTML = `🔍 Chiamata di <strong>${gameState.activeSuggestion.callerName}</strong> in verifica...`;
         diceBtn.disabled = true;
         suggestBtn.disabled = true;
+        endTurnBtn.disabled = true;
         return;
       }
 
       if (isMyTurn) {
         suggestBtn.disabled = false;
+        endTurnBtn.disabled = false;
         if (gameState.stepsLeft > 0) {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (o formula un'ipotesi)`;
+          statusDiv.innerHTML = `🎯 <strong>Tocca a te!</strong> Passi: <strong>${gameState.stepsLeft}</strong> (Tocca una casella adiacente)`;
           diceBtn.disabled = true;
         } else {
-          statusDiv.innerHTML = `<strong>Tocca a te!</strong> Tira il dado o fai una chiamata.`;
+          statusDiv.innerHTML = `🎲 <strong>Tocca a te!</strong> Tira il dado o formula un'ipotesi.`;
           diceBtn.disabled = false;
         }
       } else {
         const activeNameSafe = document.createElement('span');
         activeNameSafe.textContent = activePlayer.name;
-        statusDiv.innerHTML = 'Turno di: ';
+        statusDiv.innerHTML = '⏳ Turno di: ';
         const strong = document.createElement('strong');
         strong.appendChild(activeNameSafe);
         statusDiv.appendChild(strong);
         diceBtn.disabled = true;
         suggestBtn.disabled = true;
+        endTurnBtn.disabled = true;
       }
     }
 
@@ -694,28 +1030,27 @@
 
       for (let y = 0; y < GRID_SIZE; y++) {
         for (let x = 0; x < GRID_SIZE; x++) {
-          ctx.fillStyle = '#1e293b';
+          ctx.fillStyle = ((x + y) % 2 === 0) ? '#1e293b' : '#0f172a';
           ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
           ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
           ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
         }
       }
 
       gameState.players.forEach(p => {
         ctx.beginPath();
-        ctx.arc(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE / 3, 0, Math.PI * 2);
+        ctx.arc(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE / 2.6, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
-        if (p.id === myId) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '10px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('IO', p.x * TILE + TILE / 2, p.y * TILE + TILE / 1.5);
-        }
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.id === myId ? 'TU' : p.name.substring(0, 3).toUpperCase(), p.x * TILE + TILE / 2, p.y * TILE + TILE / 1.6);
       });
     }
 
@@ -735,7 +1070,9 @@
 
     function renderMyCards() {
       const container = document.getElementById('my-cards-container');
+      const countEl = document.getElementById('my-cards-count');
       container.innerHTML = '';
+      countEl.textContent = myCards.length;
 
       if (myCards.length === 0) {
         container.innerHTML = '<div style="color: #94a3b8; font-size: 13px;">Nessuna carta assegnata.</div>';
@@ -745,7 +1082,7 @@
       myCards.forEach(card => {
         const div = document.createElement('div');
         div.className = 'card-pill';
-        div.textContent = card;
+        div.innerHTML = `<span>🔍</span> <span>${card}</span>`;
         container.appendChild(div);
       });
     }
